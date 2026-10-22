@@ -1,0 +1,16 @@
+# Dati personali: non vanno mai caricati su GitHub
+dati/
+*.xlsx
+~$*
+impostazioni.json
+*_backup_*.zip
+*.csv
+
+# Impostazioni locali degli strumenti
+.claude/
+.vscode/
+
+# File di sistema
+Thumbs.db
+desktop.ini
+.DS_Store

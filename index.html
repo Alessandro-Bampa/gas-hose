@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Hose</title>
+  <meta name="description" content="Hose: gestione del risparmio mensile con la regola 50/30/20. I dati restano sul tuo dispositivo.">
+
+  <!-- App installabile (PWA) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0e0d" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Hose">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="gated">
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <img class="brand-logo" src="icons/icon-192.png" alt="" width="34" height="34">
+      <span>Hose <small>50/30/20</small></span>
+    </a>
+    <nav class="tabs" aria-label="Sezioni">
+      <a href="#/" data-nav="mese">Mese</a>
+      <a href="#/riepilogo" data-nav="riepilogo">Riepilogo</a>
+      <a href="#/obiettivi" data-nav="obiettivi">Obiettivi</a>
+      <a href="#/impostazioni" data-nav="impostazioni">Impostazioni</a>
+    </nav>
+    <div id="save-status" class="save-status" aria-live="polite"></div>
+  </header>
+
+  <main id="app" class="container">
+    <noscript>Per usare Hose è necessario abilitare JavaScript.</noscript>
+  </main>
+
+  <dialog id="dialog"></dialog>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <input type="file" id="import-input" accept=".xlsx,.json,.zip" multiple hidden>
+
+  <script src="js/xlsx-lite.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
