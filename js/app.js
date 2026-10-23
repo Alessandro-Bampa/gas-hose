@@ -717,7 +717,7 @@
         <h2>${icon('target')} Metti da parte i soldi per qualcosa di preciso</h2>
         <p class="explain" style="margin-top:10px">Indica quanto ti serve e per quando: Hose calcola la rata da accantonare ogni mese.
         Scegli da quale budget prenderla:</p>
-        <p class="explain" style="margin-top:8px"><span class="swatch sw-des"></span> <strong>${DIV.des.nome}</strong> per qualcosa che vuoi, es. <em>Viaggio in Giappone · 3.000 € · maggio 2028</em>.<br>
+        <p class="explain" style="margin-top:8px"><span class="swatch sw-des"></span> <strong>${DIV.des.nome}</strong> per qualcosa che vuoi, es. <em>Viaggio · 3.000 € · maggio 2028</em>.<br>
         <span class="swatch sw-ris"></span> <strong>${DIV.ris.nome}</strong> per una spesa futura prevista, es. <em>Caldaia nuova · 2.500 € · tra 3 anni</em>.</p>
         <p class="explain" style="margin-top:8px">La rata resta fissa: se accantoni di più o di meno l'app ti propone di cambiarla o di spostare la scadenza. Puoi coprire subito una parte con l'avanzo (o con i risparmi già accumulati). Ogni obiettivo ha un fondo tutto suo, escluso da avanzi e risparmi.</p>
         <div class="actions"><button class="btn primary lg" data-action="add-goal">${icon('plus')} Crea il primo obiettivo</button></div>
@@ -1374,12 +1374,12 @@
       ? `<div class="f"><span>Si accantona dal budget</span><div class="goal-div fixed"><span class="swatch sw-${g.div}"></span>${DIV[g.div].nome}</div></div>`
       : `<div class="f"><span>Da quale budget accantonare?</span>
           <div class="seg seg-radio">${Model.GOAL_DIVS.map(k => `<label><input type="radio" name="gdiv" value="${k}" ${k === div0 ? 'checked' : ''}><span>${DIV[k].nome}</span></label>`).join('')}</div>
-          <span class="hint">${DIV.des.nome}: qualcosa che vuoi (es. viaggio in Giappone). ${DIV.ris.nome}: una spesa futura prevista (es. caldaia tra 3 anni).</span></div>`;
+          <span class="hint">${DIV.des.nome}: qualcosa che vuoi (es. Viaggio). ${DIV.ris.nome}: una spesa futura prevista (es. caldaia tra 3 anni).</span></div>`;
 
     openDialog(`<form class="dlg" novalidate>
-      <header><h2>${g ? 'Modifica obiettivo' : 'Nuovo obiettivo'}</h2><div class="muted">Es. Viaggio in Giappone · 3.000 € · maggio 2028</div></header>
+      <header><h2>${g ? 'Modifica obiettivo' : 'Nuovo obiettivo'}</h2><div class="muted">Es. Viaggio · 3.000 € · maggio 2028</div></header>
       <div class="fields">
-        <label class="f"><span>Nome</span><input name="nome" maxlength="40" placeholder="Viaggio in Giappone" value="${esc(g ? g.nome : '')}"></label>
+        <label class="f"><span>Nome</span><input name="nome" maxlength="40" placeholder="Viaggio" value="${esc(g ? g.nome : '')}"></label>
         ${divField}
         <div class="two">
           <label class="f"><span>Importo da raggiungere (€)</span><input name="importo" inputmode="decimal" placeholder="3.000,00" value="${g ? moneyInput(g.importo) : ''}"></label>

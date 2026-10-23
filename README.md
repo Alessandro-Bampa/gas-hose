@@ -2,6 +2,8 @@
 
 <img src="icons/icon-192.png" alt="" width="96" align="right">
 
+**Italiano** · [English](README.en.md)
+
 Applicazione per gestire il risparmio mensile con la regola **50/30/20**:
 le entrate di ogni mese vengono divise in tre budget, **Necessità** (50%),
 **Svago** (30%) e **Risparmi** (20%). Le percentuali si possono cambiare.
@@ -17,7 +19,8 @@ scelta da te, oppure nel browser.
 Apri **https://alessandro-bampa.github.io/gas-hose/** e, se vuoi, installala come app:
 
 - **Chrome / Edge su computer:** icona «Installa» nella barra dell'indirizzo.
-- **Android (Chrome):** menu ⋮ › *Installa app* (o *Aggiungi a schermata Home*).
+- **Android (Chrome):** menu ⋮ › *Installa app*. Se compare solo *Aggiungi a schermata Home*,
+  toccalo e scegli *Installa* (non «Crea scorciatoia»).
 - **iPhone / iPad (Safari):** pulsante Condividi › *Aggiungi alla schermata Home*.
 
 Una volta aperta, l'app funziona anche **senza connessione**.
@@ -29,21 +32,33 @@ ma tutto il resto funziona allo stesso modo.
 
 ## Dove vanno i dati
 
-Al primo avvio scegli dove salvarli:
+Al primo avvio scegli dove salvarli.
 
-- **In una cartella del computer** (Chrome/Edge su computer, consigliato): un file Excel per
-  anno, aggiornato in automatico. Il browser chiede il permesso di modificare i file: scegli
-  **«Consenti a ogni visita»** per non doverlo riconfermare.
-- **Solo in questo browser** (telefono, Firefox, Safari): i dati restano nella memoria del
-  browser, o dell'app installata. Con *Impostazioni › Esporta* scarichi gli Excel o un backup
-  completo `.zip`, con *Importa* lo ripristini o lo sposti su un altro dispositivo.
+**In una cartella** (Chrome/Edge su computer, Chrome su Android). Un file Excel per anno,
+aggiornato in automatico. Il browser chiede il permesso di modificare i file: sul computer
+scegli **«Consenti a ogni visita»**; su Android può chiedere di riconfermarlo a ogni apertura
+(«Riconnetti»).
 
-I dati del telefono e quelli del computer **non si sincronizzano** da soli: si passano con
-Esporta/Importa.
+- **Computer:** puoi scegliere una cartella dentro OneDrive, Google Drive per desktop o iCloud
+  per Windows, così i file finiscono anche nel cloud.
+- **Android:** scegli una cartella come `Documenti/Hose` (evita `Android/data`, che il sistema
+  può svuotare). Per avere gli stessi file anche sul computer, sincronizza quella cartella con il
+  cloud tramite un'app di sincronizzazione.
+- Se cancelli i dati di Chrome o disinstalli l'app, i file nella cartella **restano**: basta
+  riaprire Hose e scegliere di nuovo la stessa cartella.
 
-> **Attenzione:** nella modalità «solo browser», *Cancella spazio di archiviazione* di Chrome
-> (o «Cookie e dati dei siti») cancella anche i dati di Hose. Svuotare solo la cache non li
-> tocca. Fai ogni tanto un **Backup completo** e salvalo su Drive/OneDrive.
+**Solo in questo browser** (iPhone/iPad, Firefox, Safari). I dati restano nella memoria del
+browser o dell'app installata. Con *Impostazioni › Esporta* scarichi gli Excel o un backup
+completo `.zip` (su iPhone puoi salvarlo in File › iCloud Drive); con *Importa* lo ripristini
+o lo sposti su un altro dispositivo.
+
+> **Attenzione:** in questa modalità, *Cancella spazio di archiviazione* di Chrome (o «Cookie e
+> dati dei siti») cancella anche i dati di Hose; svuotare solo la cache non li tocca. Fai ogni
+> tanto un **Backup completo**.
+
+**Più dispositivi sugli stessi file.** Hose legge i file all'apertura. Se modifichi da un
+dispositivo, chiudi e riapri l'app sull'altro prima di inserire nuovi dati, altrimenti il
+salvataggio successivo sovrascrive le modifiche fatte altrove.
 
 ## Cosa c'è nella cartella dati
 
@@ -53,9 +68,6 @@ dati/
   Hose_2026.xlsx
   impostazioni.json       ← percentuali predefinite, categorie, obiettivi
 ```
-
-I file con il nome della versione precedente (`Salvadanaio_2026.xlsx`) vengono letti e copiati
-automaticamente in `Hose_2026.xlsx`; dopo puoi eliminare il vecchio file.
 
 I file vengono aggiornati in automatico a ogni modifica (in alto a destra vedi «Salvato alle …»).
 **Non tenere aperto il file Excel mentre usi l'app**: Excel lo blocca e il salvataggio non riesce
