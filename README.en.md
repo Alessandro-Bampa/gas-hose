@@ -161,8 +161,15 @@ added to the long trip's goal.
 - **Start with a lump sum:** when you create or edit a goal you can cover part of it right away,
   with leftovers from previous months (Svago) or by moving money from a fund of your accumulated
   savings (Risparmi). The instalment goes down accordingly.
-- **Ring-fenced money:** regular withdrawals can't touch a goal's fund. You spend it only for the
-  goal, with **«Usa il fondo»** (use the fund) on its card (e.g. the flight deposit).
+- **Ring-fenced money:** regular withdrawals can't touch a goal's fund. For expenses **related to
+  the goal**, use **«Usa il fondo»** (use the fund) on its card (e.g. flight tickets, expenses
+  during the trip): the card shows how much you set aside, how much you've already used and how
+  much is left.
+- **Releasing money:** if you need some of the fund for **other expenses**, use **«Svincola»**
+  (release). For Svago the amount goes back to Svago's leftovers; for Risparmi it goes back to
+  your free savings, into the fund you choose. The amount set aside goes down, so you choose right
+  away whether to **recalculate the instalment** (same deadline), **keep the instalment** and move
+  the date, or decide later.
 - **Deleting a goal:** for Svago, the money set aside goes back to Svago's leftovers. For
   Risparmi, it goes back to accumulated savings as a free fund named after the goal.
 

@@ -171,7 +171,7 @@
       const perc = this.perc(y, m);
       const entrate = sum(mo.entrate);
       const budget = zero(), speso = zero(), saldo = zero(), dalRiporto = zero(), prelievi = zero(), netto = zero();
-      const perObiettivi = zero(), accLiberi = zero(), preLiberi = zero();
+      const perObiettivi = zero(), accLiberi = zero(), preLiberi = zero(), daObiettivi = zero();
       for (const k of KEYS) {
         const own = mo.uscite.filter(u => u.div === k);
         const free = own.filter(u => !this.goalOf(u));
@@ -182,17 +182,19 @@
         perObiettivi[k] = sum(own.filter(u => tipoOf(u) !== 'prelievo' && this.goalOf(u)));
         accLiberi[k] = sum(free.filter(u => tipoOf(u) !== 'prelievo'));
         preLiberi[k] = sum(free.filter(u => tipoOf(u) === 'prelievo'));
+        // soldi tornati liberi da un obiettivo (svincolati): entrano nei risparmi ma non sono nuovi accantonamenti
+        daObiettivi[k] = sum(free.filter(u => tipoOf(u) === 'riporto'));
         saldo[k] = r2(budget[k] - speso[k]);
         // Variazione dell'avanzo nel mese. Necessità e Svago: quanto resta del budget meno
         // quanto usato dall'avanzo. Risparmi: quanto accantoni meno i prelievi (sono i
         // risparmi accumulati). I soldi degli obiettivi restano fuori: hanno un fondo loro.
         netto[k] = k === 'ris' ? r2(accLiberi[k] - preLiberi[k]) : r2(saldo[k] - dalRiporto[k]);
       }
-      return { y, m, entrate, perc, budget, speso, saldo, dalRiporto, prelievi, netto, perObiettivi, accLiberi, preLiberi, vuoto: !hasData(mo) };
+      return { y, m, entrate, perc, budget, speso, saldo, dalRiporto, prelievi, netto, perObiettivi, accLiberi, preLiberi, daObiettivi, vuoto: !hasData(mo) };
     }
 
     yearTotals(y) {
-      const fields = ['budget', 'speso', 'saldo', 'dalRiporto', 'prelievi', 'netto', 'perObiettivi', 'accLiberi', 'preLiberi'];
+      const fields = ['budget', 'speso', 'saldo', 'dalRiporto', 'prelievi', 'netto', 'perObiettivi', 'accLiberi', 'preLiberi', 'daObiettivi'];
       const t = { entrate: 0 };
       for (const f of fields) t[f] = zero();
       for (let m = 0; m < 12; m++) {
@@ -338,14 +340,16 @@
     /** Stato di un obiettivo rispetto al mese di riferimento ref = { y, m }. */
     goalStatus(g, ref) {
       const div = g.div || 'ris';
-      let prima = g.iniziale || 0, mese = 0, dopo = 0, dalRiporto = 0, prelevato = 0;
+      let prima = g.iniziale || 0, mese = 0, dopo = 0, dalRiporto = 0, prelevato = 0, svincolato = 0;
       for (const y of this.years()) {
         this.anni[y].mesi.forEach((mo, m) => {
           for (const u of mo.uscite) {
             if (!g.id || u.obiettivo !== g.id || u.div !== div) continue;
             const t = tipoOf(u);
             if (t === 'prelievo') { prelevato += u.importo; continue; }
-            if (t === 'riporto') dalRiporto += u.importo;
+            // "riporto" positivo: soldi aggiunti dall'avanzo o dai risparmi;
+            // negativo: soldi svincolati, tornati disponibili per altre spese.
+            if (t === 'riporto') { if (u.importo < 0) svincolato -= u.importo; else dalRiporto += u.importo; }
             const before = y < ref.y || (y === ref.y && m < ref.m);
             const now = y === ref.y && m === ref.m;
             // Quanto preso dal riporto nel mese corrente abbassa subito la rata.
@@ -382,13 +386,14 @@
       let piano = 'linea';
       if (attivo && restante > 0) {
         if (scartoMesi < 0) piano = 'ritardo';
-        else if (scartoMesi > 0 || necessaria < rata - Math.max(1, rata * 0.03)) piano = 'anticipo';
+        // "in anticipo" solo se arrivi almeno un mese prima o la rata potrebbe scendere di almeno il 10%
+        else if (scartoMesi > 0 || necessaria < rata * 0.9) piano = 'anticipo';
       }
 
       return {
         div, accantonato, prima: r2(prima), mese: r2(mese), residuo, mesi, quota, stato,
         rata, necessaria, necessariaOra, mesiNecessari, pronto, scartoMesi, piano,
-        dalRiporto: r2(dalRiporto), prelevato: r2(prelevato), fondo: r2(accantonato - prelevato),
+        dalRiporto: r2(dalRiporto), svincolato: r2(svincolato), prelevato: r2(prelevato), fondo: r2(accantonato - prelevato),
         mancante: r2(Math.max(0, g.importo - accantonato)),
         mancanteMese: attivo && quota - mese > TOLL ? r2(quota - mese) : 0,
         progress: g.importo > 0 ? Math.min(1, accantonato / g.importo) : 0,

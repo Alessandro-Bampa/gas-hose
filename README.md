@@ -153,8 +153,14 @@ categoria). Una spesa normale, anche nella stessa categoria (es. un weekend fuor
 - **Partire con una somma:** quando crei o modifichi un obiettivo puoi coprirne subito una parte,
   con l'avanzo dei mesi precedenti (Svago) o spostando soldi da un fondo dei risparmi già
   accumulati (Risparmi). La rata si abbassa di conseguenza.
-- **Soldi vincolati:** i prelievi normali non possono toccare il fondo di un obiettivo. Lo spendi
-  solo per l'obiettivo, con **«Usa il fondo»** nella sua scheda (es. l'acconto del volo).
+- **Soldi vincolati:** i prelievi normali non possono toccare il fondo di un obiettivo. Per le
+  spese **dell'obiettivo** usa **«Usa il fondo»** nella sua scheda (es. i biglietti del volo, le
+  spese durante il viaggio): la scheda mostra quanto hai messo da parte, quanto hai già usato e
+  quanto resta.
+- **Svincolare:** se ti servono soldi del fondo per **altre spese**, usa **«Svincola»**. Per lo
+  Svago la somma torna nell'avanzo di Svago; per i Risparmi torna nei risparmi liberi, nel fondo
+  che scegli. Il messo da parte cala, quindi scegli subito se **ricalcolare la rata** (stessa
+  scadenza), **mantenere la rata** spostando la data, oppure decidere dopo.
 - **Eliminare un obiettivo:** per lo Svago, i soldi messi da parte tornano nell'avanzo di Svago.
   Per i Risparmi, tornano nei risparmi accumulati come fondo libero con il nome dell'obiettivo.
 

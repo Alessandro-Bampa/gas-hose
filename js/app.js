@@ -420,11 +420,17 @@
     const sub = isIn ? '' : it.descrizione;
     let tag = '';
     if (kind === 'riporto') {
-      tag = it.div === 'ris'
-        ? '<span class="tag t-rip" title="Soldi spostati dai risparmi già accumulati: non contano come nuovo accantonamento">dai risparmi</span>'
-        : it.importo < 0
+      if (goal && it.importo < 0) {
+        tag = `<span class="tag t-rip" title="Soldi svincolati dal fondo dell'obiettivo: tornano ${it.div === 'ris' ? 'nei risparmi liberi' : 'nell\'avanzo'}">svincolato</span>`;
+      } else if (it.div === 'ris') {
+        tag = goal
+          ? '<span class="tag t-rip" title="Soldi spostati dai risparmi già accumulati: non contano come nuovo accantonamento">dai risparmi</span>'
+          : '<span class="tag t-rip" title="Soldi svincolati da un obiettivo e tornati nei risparmi liberi">dall\'obiettivo</span>';
+      } else {
+        tag = it.importo < 0
           ? '<span class="tag t-rip" title="Soldi restituiti all\'avanzo dei mesi precedenti">all\'avanzo</span>'
           : '<span class="tag t-rip" title="Pagato con l\'avanzo dei mesi precedenti: non pesa sul budget del mese">dall\'avanzo</span>';
+      }
     } else if (kind === 'prelievo') {
       tag = '<span class="tag t-pre" title="Pagato con soldi già accantonati: non pesa sul budget del mese">prelievo</span>';
     }
@@ -473,7 +479,8 @@
     const cushion = isRis
       ? `<dl class="cushion">
           <dt><span class="help" title="Quanto hai accantonato in tutti i mesi precedenti, meno i prelievi. I soldi degli obiettivi sono esclusi: hanno un fondo a parte.">Risparmi dei mesi precedenti</span></dt><dd>${eur(rip[k])}</dd>
-          ${st.accLiberi[k] ? `<dt>Accantonati questo mese</dt><dd class="pos">+${eur(st.accLiberi[k])}</dd>` : ''}
+          ${r2(st.accLiberi[k] - st.daObiettivi[k]) ? `<dt>Accantonati questo mese</dt><dd class="pos">+${eur(r2(st.accLiberi[k] - st.daObiettivi[k]))}</dd>` : ''}
+          ${st.daObiettivi[k] ? `<dt>Svincolati dagli obiettivi</dt><dd class="pos">+${eur(st.daObiettivi[k])}</dd>` : ''}
           ${st.preLiberi[k] ? `<dt>Prelievi questo mese</dt><dd class="neg">−${eur(st.preLiberi[k])}</dd>` : ''}
           <dt class="total"><span class="help" title="Risparmi dei mesi precedenti + accantonamenti − prelievi. Passa al mese successivo.">Risparmi totali a fine mese</span></dt><dd class="total">${eur(fine)}</dd>
         </dl>`
@@ -562,7 +569,7 @@
     h += `<div class="kpis">
       <div class="card kpi"><div class="label">Entrate ${y}</div><div class="value">${eur(yt.entrate)}</div><div class="sub">${stats.filter(s => s.entrate > 0).length} mesi con entrate</div></div>
       <div class="card kpi"><div class="label">Spese (necessità + svago)</div><div class="value">${eur(spese)}</div><div class="sub">${ofIncome(spese)}</div></div>
-      <div class="card kpi"><div class="label">Risparmi accumulati nel ${y}</div><div class="value ${valTone(delta.ris)}">${signed(delta.ris)}</div><div class="sub">accantonati ${eur(yt.accLiberi.ris)}${yt.preLiberi.ris ? ` · prelievi −${eur(yt.preLiberi.ris)}` : ''}</div></div>
+      <div class="card kpi"><div class="label">Risparmi accumulati nel ${y}</div><div class="value ${valTone(delta.ris)}">${signed(delta.ris)}</div><div class="sub">accantonati ${eur(r2(yt.accLiberi.ris - yt.daObiettivi.ris))}${yt.daObiettivi.ris ? ` · svincolati ${eur(yt.daObiettivi.ris)}` : ''}${yt.preLiberi.ris ? ` · prelievi −${eur(yt.preLiberi.ris)}` : ''}</div></div>
       <div class="card kpi"><div class="label">Avanzato (necessità + svago)</div><div class="value ${valTone(avanzato)}">${signed(avanzato)}</div><div class="sub">Quanto è cambiato l'avanzo nell'anno</div></div>
     </div>`;
 
@@ -570,7 +577,8 @@
       <div class="counter"><h3><span class="swatch sw-${k}"></span>${DIV[k].nome}</h3>
         <dl>
           <dt>Risparmi a inizio ${y}</dt><dd>${eur(opening[k])}</dd>
-          <dt>Accantonati</dt><dd class="pos">+${eur(yt.accLiberi[k])}</dd>
+          <dt>Accantonati</dt><dd class="pos">+${eur(r2(yt.accLiberi[k] - yt.daObiettivi[k]))}</dd>
+          ${yt.daObiettivi[k] ? `<dt>Svincolati dagli obiettivi</dt><dd class="pos">+${eur(yt.daObiettivi[k])}</dd>` : ''}
           ${yt.preLiberi[k] ? `<dt>Prelievi</dt><dd class="neg">−${eur(yt.preLiberi[k])}</dd>` : ''}
           <div class="total" style="display:contents"><dt>Risparmi ${y === t.y ? 'attuali' : y < t.y ? 'a fine anno' : 'previsti a fine anno'}</dt><dd>${eur(closing[k])}</dd></div>
         </dl>
@@ -792,7 +800,9 @@
       : s.stato === 'scaduto' ? '<span class="pill bad">Scaduto</span>'
         : `<span class="pill">${s.mesi <= 0 ? 'Ultimo mese' : nMesi(s.mesi)}</span>`;
     const useFund = s.fondo > 0.004
-      ? `<button class="btn sm" data-action="goal-spend" data-id="${esc(g.id)}" title="Registra una spesa pagata con i soldi di questo obiettivo">Usa il fondo</button>` : '';
+      ? `<button class="btn sm" data-action="goal-spend" data-id="${esc(g.id)}" title="Spesa per l'obiettivo (es. i biglietti del volo), pagata con i soldi del suo fondo">Usa il fondo</button>` : '';
+    const release = s.fondo > 0.004
+      ? `<button class="btn sm ghost" data-action="goal-release" data-id="${esc(g.id)}" title="Libera una parte del fondo per altre spese ${g.div === 'ris' ? 'dei Risparmi' : 'di Svago'}, non legate all'obiettivo">Svincola</button>` : '';
 
     let month = '';
     if (s.stato === 'attivo') {
@@ -812,7 +822,8 @@
 
     const extra = [];
     if (s.dalRiporto) extra.push(`di cui ${eur(s.dalRiporto)} ${g.div === 'ris' ? 'dai risparmi accumulati' : 'dall\'avanzo'}`);
-    if (s.prelevato) extra.push(`già usati ${eur(s.prelevato)}, nel fondo restano ${eur(s.fondo)}`);
+    if (s.svincolato) extra.push(`svincolati ${eur(s.svincolato)} per altre spese`);
+    if (s.prelevato) extra.push(`già usati per l'obiettivo ${eur(s.prelevato)}, nel fondo restano ${eur(s.fondo)}`);
 
     return `<article class="card goal ${s.stato}">
       <header><div><h3>${esc(g.nome)}</h3><span class="goal-div"><span class="swatch sw-${g.div}"></span>${DIV[g.div].nome}</span></div>${pill}</header>
@@ -827,7 +838,7 @@
       </dl>
       ${month}
       <footer><span title="Le spese normali e i prelievi non toccano questo fondo">${icon('lock')} Fondo vincolato all'obiettivo</span>
-        <span>${s.stato === 'attivo' ? useFund : ''}<button class="btn ghost sm" data-action="edit-goal" data-id="${esc(g.id)}">${icon('edit')} Modifica</button></span></footer>
+        <span>${s.stato === 'attivo' ? useFund : ''}${release}<button class="btn ghost sm" data-action="edit-goal" data-id="${esc(g.id)}">${icon('edit')} Modifica</button></span></footer>
     </article>`;
   }
 
@@ -1331,6 +1342,93 @@
     out.innerHTML = txt;
   }
 
+  /** Stato dell'obiettivo se oggi si svincolassero x euro dal suo fondo. */
+  const afterRelease = (g, x) => budget.goalStatus({ ...g, iniziale: (g.iniziale || 0) - x }, today());
+
+  /**
+   * Svincola una parte del fondo per spese non legate all'obiettivo. Svago: i soldi tornano
+   * nell'avanzo di Svago. Risparmi: tornano nei risparmi liberi, nel fondo scelto. Il messo da
+   * parte cala, quindi si sceglie se ricalcolare la rata o spostare la scadenza.
+   */
+  function dlgRelease(id) {
+    const g = budget.goal(id);
+    if (!g) return;
+    const t = today();
+    if (state.yearErrors[t.y]) { toast('Il file dell\'anno corrente non è leggibile.', { error: true }); return; }
+    const s = budget.goalStatus(g, t);
+    const isRis = g.div === 'ris';
+    const dests = budget.settings.categorie.ris;
+    const defDest = dests.includes('Fondo di emergenza') ? 'Fondo di emergenza' : dests[0];
+
+    openDialog(`<form class="dlg" novalidate>
+      <header><h2>Svincola dal fondo</h2><div class="muted">${esc(g.nome)} · nel fondo ci sono ${eur(s.fondo)}</div></header>
+      <div class="fields">
+        <p class="small muted">${isRis
+          ? 'I soldi svincolati tornano nei risparmi accumulati, nel fondo che scegli: da lì potrai prelevarli per altre spese.'
+          : `I soldi svincolati tornano nell'avanzo di ${DIV.des.nome}: potrai usarli per altre spese di svago.`}
+          Per una spesa che riguarda l'obiettivo (es. i biglietti del volo) usa invece «Usa il fondo».</p>
+        <label class="f"><span>Importo da svincolare (€)</span><input name="importo" class="amount" inputmode="decimal" autocomplete="off" placeholder="0,00">
+          <span class="hint">Al massimo ${eur(s.fondo)} · <button type="button" class="link" data-all>tutto</button></span></label>
+        ${isRis && dests.length ? `<label class="f"><span>Sposta nel fondo</span><select name="dest">${dests.map(c => `<option value="${esc(c)}" ${c === defDest ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>` : ''}
+        <label class="f"><span>Per cosa <span class="hint">(facoltativo)</span></span><input name="descrizione" maxlength="80" placeholder="Es. regalo di compleanno"></label>
+        <fieldset class="rip-box"><legend>Dopo lo svincolo</legend><div class="small" data-plan></div></fieldset>
+        <div class="error-msg" role="alert"></div>
+      </div>
+      <footer><span class="grow"></span>
+        <button type="button" class="btn ghost" data-close>Annulla</button>
+        <button type="submit" value="save" class="btn primary">Svincola</button>
+      </footer>
+    </form>`, form => {
+      const x = Model.parseAmount(form.importo.value);
+      if (!isFinite(x) || x <= 0) return 'Inserisci l\'importo da svincolare.';
+      if (x > s.fondo + 0.004) return `Nel fondo ci sono solo ${eur(s.fondo)}.`;
+      if (isRis && !(form.dest && form.dest.value)) return 'Scegli il fondo dei risparmi in cui spostare i soldi.';
+      const amt = r2(x);
+      const a = afterRelease(g, amt);
+      const plan = (form.querySelector('input[name="plan"]:checked') || {}).value;
+      const desc = form.descrizione.value.trim();
+      const mo = budget.ensureMonth(t.y, t.m);
+      mo.uscite.push({
+        id: Model.newId(), div: g.div, tipo: 'riporto', obiettivo: g.id, categoria: g.nome, importo: -amt,
+        descrizione: desc ? `Svincolati: ${desc}` : 'Svincolati dal fondo', data: isoToday(), ricorrente: false,
+      });
+      if (isRis) {
+        mo.uscite.push({
+          id: Model.newId(), div: 'ris', tipo: 'riporto', categoria: form.dest.value, importo: amt,
+          descrizione: `Svincolati dall'obiettivo «${g.nome}»`, data: isoToday(), ricorrente: false,
+        });
+      }
+      let msg = `Svincolati ${eur(amt)} da «${g.nome}»: ${isRis ? `ora sono in «${form.dest.value}»` : `ora sono nell'avanzo di ${DIV.des.nome}`}.`;
+      if (plan === 'rata' && a.necessaria > 0) { g.rata = a.necessaria; msg += ` Nuova rata: ${eur(a.necessaria)}.`; }
+      if (plan === 'data' && a.piano === 'ritardo') { g.scadenza = a.pronto; msg += ` Nuova scadenza: ${monthName(a.pronto)}.`; }
+      markDirty(t.y);
+      markSettings();
+      render();
+      toast(msg, { ms: 7000 });
+      return true;
+    }, form => {
+      const box = form.querySelector('[data-plan]');
+      const upd = () => {
+        const v = Model.parseAmount(form.importo.value);
+        if (!isFinite(v) || v <= 0) { box.innerHTML = 'Inserisci l\'importo per vedere come cambia il piano.'; return; }
+        const a = afterRelease(g, Math.min(v, s.fondo));
+        if (a.stato === 'scaduto') { box.innerHTML = 'La scadenza è già passata: la rata non cambia.'; return; }
+        if (a.stato === 'raggiunto') { box.innerHTML = 'Anche dopo lo svincolo l\'obiettivo resta raggiunto.'; return; }
+        if (a.piano !== 'ritardo') { box.innerHTML = `Il piano resta in linea: con ${eur(a.rata)} al mese arrivi comunque alla scadenza.`; return; }
+        const prev = (form.querySelector('input[name="plan"]:checked') || {}).value || 'rata';
+        const opt = (value, html) => `<label class="check"><input type="radio" name="plan" value="${value}" ${value === prev ? 'checked' : ''}><span>${html}</span></label>`;
+        box.innerHTML = `<p class="muted" style="margin:0 0 6px">Nel fondo resteranno ${eur(r2(a.fondo))} e con la rata attuale saresti indietro.</p>` +
+          opt('rata', `<strong>Ricalcola la rata</strong>: ${eur(a.necessaria)} al mese invece di ${eur(a.rata)}, scadenza invariata (${monthName(g.scadenza)})`) +
+          opt('data', `<strong>Mantieni la rata</strong> di ${eur(a.rata)}: il fondo sarà pronto ${aMese(a.pronto)} invece che ${aMese(g.scadenza)}`) +
+          opt('dopo', 'Decido dopo: la scheda dell\'obiettivo ti mostrerà le proposte');
+      };
+      form.addEventListener('input', e => { if (e.target.name === 'importo') upd(); });
+      form.querySelector('[data-all]').addEventListener('click', () => { form.importo.value = moneyInput(s.fondo); upd(); });
+      upd();
+      form.importo.focus();
+    });
+  }
+
   /** Elimina un obiettivo. Svago: i soldi rimasti tornano nell'avanzo. Risparmi: tornano nei risparmi liberi. */
   function deleteGoal(g) {
     const t = today();
@@ -1617,6 +1715,7 @@
         break;
       }
       case 'goal-riporto': dlgGoal(el.dataset.id, { focusRiporto: true }); break;
+      case 'goal-release': dlgRelease(el.dataset.id); break;
       case 'goal-spend': {
         const g = budget.goal(el.dataset.id);
         if (!g) break;

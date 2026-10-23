@@ -285,7 +285,7 @@ body.gated .tabs, body.gated .save-status { visibility: hidden; }
 .div-ris .meter, .meter.ris { background: var(--ris-soft); } .div-ris .meter > span, .meter.ris > span { background: var(--ris); }
 .meter.over > span { background: var(--neg) !important; }
 .div-ris .meter.over > span { background: var(--ris) !important; }
-.meter-cap { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.meter-cap { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-2); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 .mov-list { list-style: none; margin: 12px 0 0; padding: 0; }
 .division .mov-list { border-top: 1px solid var(--line); padding: 4px 18px; }
