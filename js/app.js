@@ -23,6 +23,8 @@
     saveState: 'idle', // idle | pending | saving | saved | error
     savedAt: null,
     yearErrors: {},    // { anno: 'messaggio' } — file non leggibili: mai sovrascritti
+    importLogs: {},    // { 'AAAA-MM': { rif: record } } — registri dell'import letti finora
+    dirtyImport: new Set(),
   };
 
   /* ================================================================ utilità */
@@ -116,7 +118,7 @@
     scheduleSave();
   }
   function markSettings() { state.dirtySettings = true; scheduleSave(); }
-  const hasPending = () => state.dirtyYears.size > 0 || state.dirtySettings || state.saving;
+  const hasPending = () => state.dirtyYears.size > 0 || state.dirtySettings || state.dirtyImport.size > 0 || state.saving;
 
   function scheduleSave() {
     state.saveState = 'pending';
@@ -137,7 +139,7 @@
   async function flush() {
     clearTimeout(saveTimer);
     if (state.saving) { saveTimer = setTimeout(flush, 300); return; }
-    if (!state.dirtyYears.size && !state.dirtySettings) {
+    if (!state.dirtyYears.size && !state.dirtySettings && !state.dirtyImport.size) {
       if (state.saveState === 'pending') state.saveState = 'saved';
       renderStatus();
       return;
@@ -162,6 +164,11 @@
         state.dirtySettings = false;
         state.dirtyYears.clear();
         Store.saveBrowser(budget.toJSON());
+      }
+      for (const key of [...state.dirtyImport].sort()) {
+        state.dirtyImport.delete(key);
+        try { await Store.writeImportLog(key, state.importLogs[key] || {}); }
+        catch (e) { state.dirtyImport.add(key); throw e; }
       }
       state.saveState = 'saved';
       state.savedAt = new Date();
@@ -200,6 +207,8 @@
     state.yearErrors = {};
     state.dirtyYears.clear();
     state.dirtySettings = false;
+    state.importLogs = {};
+    state.dirtyImport.clear();
     if (Store.mode === 'folder') {
       const res = await Store.readFolder();
       if (res.settingsError) toast('impostazioni.json non leggibile: uso le impostazioni predefinite.', { error: true });
@@ -216,6 +225,7 @@
       }
       if (!res.settings && !res.settingsError) markSettings();
       migrateSettings(res.settings);
+      await migrateImportLog();
       // file col nome precedente (Salvadanaio_AAAA.xlsx): si riscrive subito come Hose_AAAA.xlsx
       const legacy = res.years.filter(f => f.legacy && budget.anni[f.year]);
       if (legacy.length) {
@@ -228,7 +238,44 @@
     budget.settings = Model.normalizeSettings(data && data.settings);
     if (data && data.anni) for (const [y, yr] of Object.entries(data.anni)) budget.anni[y] = Model.normalizeYear(yr);
     migrateSettings(data && data.settings);
+    await migrateImportLog();
     return null;
+  }
+
+  /** Carica i registri dell'import dei mesi indicati; quelli con modifiche non ancora salvate restano come sono. */
+  async function loadImportLogs(keys) {
+    for (const k of keys) if (!state.dirtyImport.has(k)) state.importLogs[k] = await Store.readImportLog(k);
+  }
+
+  /** Tutti i registri dell'import: quelli salvati più le modifiche in memoria (backup, cambio di cartella). */
+  async function allImportLogs() {
+    const all = await Store.readAllImportLogs();
+    for (const k of state.dirtyImport) all[k] = state.importLogs[k] || {};
+    return all;
+  }
+
+  // Prima i movimenti già importati stavano in impostazioni.json («visti»): si spostano nei
+  // registri mensili import/AAAA-MM.json. Non si sa più se erano stati importati o scartati.
+  async function migrateImportLog() {
+    const legacy = budget.settings.import.visti;
+    if (!legacy) return;
+    try {
+      const byMonth = {};
+      for (const rif of Object.keys(legacy)) {
+        const k = BankImport.logMonth(rif);
+        if (k) (byMonth[k] || (byMonth[k] = [])).push(rif);
+      }
+      await loadImportLogs(Object.keys(byMonth));
+      for (const [k, rifs] of Object.entries(byMonth)) {
+        for (const rif of rifs) if (!state.importLogs[k][rif]) state.importLogs[k][rif] = { esito: 'importato o scartato' };
+        state.dirtyImport.add(k);
+      }
+      delete budget.settings.import.visti;
+      markSettings();
+    } catch (e) {
+      console.error(e);
+      toast('Non sono riuscito a spostare i movimenti già importati nella cartella import: ' + describeError(e), { error: true });
+    }
   }
 
   // Impostazioni di versioni precedenti: categorie predefinite aggiornate (v1) e
@@ -277,6 +324,8 @@
     if (state.ready && hasPending()) await flush();
     const hadData = state.ready && budget.years().length > 0;
     const snapshot = hadData ? JSON.parse(JSON.stringify(budget.toJSON())) : null;
+    let logs = {};
+    if (hadData) try { logs = await allImportLogs(); } catch (e) { console.error(e); }
     try {
       await Store.pickFolder();
     } catch (e) {
@@ -289,6 +338,12 @@
     if (snapshot && folderEmpty) {
       budget.settings = Model.normalizeSettings(snapshot.settings);
       for (const [y, yr] of Object.entries(snapshot.anni)) budget.anni[y] = Model.normalizeYear(yr);
+      for (const [k, log] of Object.entries(logs)) {
+        let there = {};
+        try { there = await Store.readImportLog(k); } catch (e) { console.error(e); }
+        state.importLogs[k] = { ...there, ...log };
+        state.dirtyImport.add(k);
+      }
       markSettings();
       for (const y of budget.years()) markDirty(y);
       render();
@@ -854,7 +909,6 @@
     const t = today();
     const years = [...new Set([...budget.years(), t.y])].sort((a, b) => a - b);
     const rules = Object.entries(budget.settings.import.regole).sort((a, b) => a[0].localeCompare(b[0]));
-    const nVisti = Object.keys(budget.settings.import.visti).length;
 
     let storage;
     if (Store.mode === 'folder') {
@@ -920,7 +974,7 @@
         ? `<ul class="cat-list" style="margin:10px 0 0">${rules.map(([k, r]) => `<li><span title="${esc(k)}">${esc(k)}</span><small>${esc(destLabel(r.dest, r.categoria))}</small>
             <button class="icon-btn sm" data-action="del-rule" data-key="${esc(k)}" aria-label="Elimina la regola per ${esc(k)}" title="Elimina">${icon('x')}</button></li>`).join('')}</ul>`
         : '<p class="muted" style="margin-top:10px">Nessuna regola salvata.</p>'}
-      ${nVisti ? `<p class="muted small" style="margin-top:12px">${nVisti === 1 ? '1 movimento già importato o scartato non viene riproposto' : `${nVisti} movimenti già importati o scartati non vengono riproposti`} se reimporti lo stesso file. <button class="link" data-action="reset-visti">Dimenticali</button></p>` : ''}
+      <p class="muted small" style="margin-top:12px">I movimenti già importati o scartati sono registrati ${Store.mode === 'folder' ? `nella cartella «${Store.IMPORT_DIR}», un file per mese (${Store.IMPORT_DIR}/AAAA-MM.json)` : 'nel browser, un elenco per mese'}: se reimporti lo stesso periodo non vengono riproposti. <button class="link" data-action="reset-visti">Dimenticali</button></p>
     </section>
 
     <h2 class="section-title">Aspetto</h2>
@@ -1639,11 +1693,15 @@
       try {
         if (/\.zip$/i.test(file.name)) {
           const z = XlsxLite.unzip(await file.arrayBuffer());
+          let logs = 0;
           for (const n of z.names()) {
             const base = n.split('/').pop();
+            const log = /(?:^|\/)import\/(\d{4}-\d{2})\.json$/i.exec(n);
             if (/\.xlsx$/i.test(base) && !base.startsWith('~$')) { const y = await importYear(base, await z.bytes(n)); if (y) done.push(String(y)); }
             else if (/^impostazioni\.json$/i.test(base) && importSettings(await z.text(n), base)) done.push('impostazioni');
+            else if (log && await restoreImportLog(log[1], await z.text(n))) logs++;
           }
+          if (logs) { done.push('movimenti già importati'); scheduleSave(); }
         } else if (/\.(xls|csv)$/i.test(file.name) || (/\.xlsx$/i.test(file.name) && !Model.FILE_RE.test(file.name))) {
           // movimenti della banca; un .xlsx che non è di una banca è un file di Hose rinominato
           const buffer = await file.arrayBuffer();
@@ -1668,7 +1726,7 @@
       toast('Importato: ' + done.join(', '));
       render();
     }
-    if (bank.length) openBankImport(bank);
+    if (bank.length) await openBankImport(bank);
   }
 
   /* ===================================================== import dalla banca */
@@ -1703,11 +1761,20 @@
         toast(`«${file.name}» non è leggibile: ${e.message}`, { error: true });
       }
     }
-    if (loaded.length) openBankImport(loaded);
+    if (loaded.length) await openBankImport(loaded);
   }
 
-  function openBankImport(files) {
-    const an = BankImport.analyze(files, budget);
+  async function openBankImport(files) {
+    // si leggono solo i registri dei mesi toccati da questi movimenti (se un mese non ce l'ha, è tutto nuovo)
+    const keys = [...new Set(files.flatMap(f => f.movimenti.map(m => BankImport.logMonth(m.rif))))].filter(Boolean);
+    try {
+      await loadImportLogs(keys);
+    } catch (e) {
+      console.error(e);
+      toast('Non riesco a leggere i movimenti già importati: ' + describeError(e), { error: true });
+      return;
+    }
+    const an = BankImport.analyze(files, budget, Object.assign({}, ...keys.map(k => state.importLogs[k])));
     if (!an.proposte.length) {
       const n = an.giaImportati;
       toast(n ? `Nessun movimento nuovo: ${n === 1 ? 'l\'unico movimento era già stato importato' : `i ${n} movimenti erano già stati importati`}.` : 'Nel file non ci sono movimenti da importare.');
@@ -1717,8 +1784,26 @@
       Object.assign(p, { proposta: { dest: p.dest, categoria: p.categoria }, descOrig: p.descrizione, toccato: false, ricorda: false });
       if (state.yearErrors[p.y]) p.bloccato = `Il file del ${p.y} non è leggibile: questo movimento non verrà importato`;
     }
-    const imp = { files, ...an, fase: 'riepilogo', filtro: an.proposte.some(daVerificare) ? 'dubbi' : 'tutti', aperto: -1 };
+    const imp = { files, ...an, fase: 'riepilogo', filtro: an.proposte.some(daVerificare) ? 'dubbi' : 'tutti', aperto: -1, nuove: { nec: [], des: [] } };
+    for (const p of an.proposte) if (p.dest === 'nec' || p.dest === 'des') addCategory(imp, p.dest, p.categoria);
     bankDialog(imp);
+  }
+
+  /** Categorie proponibili nella revisione: quelle salvate più le nuove di questo import. */
+  function catList(imp, div) {
+    const own = budget.settings.categorie[div];
+    return [...own, ...imp.nuove[div].filter(c => !own.includes(c))];
+  }
+
+  /**
+   * Categoria nuova (proposta dall'import o creata nella revisione): diventa selezionabile in
+   * tutti i movimenti, ma finisce nelle impostazioni solo se all'import qualcuno la usa.
+   * → true se prima non c'era
+   */
+  function addCategory(imp, div, categoria) {
+    if (!categoria || catList(imp, div).includes(categoria)) return false;
+    imp.nuove[div].push(categoria);
+    return true;
   }
 
   /** Per una nuova destinazione scelta a mano: la categoria proposta, il fondo predefinito o «Altro». */
@@ -1818,7 +1903,8 @@
     let cat = '';
     if (p.dest === 'nec' || p.dest === 'des') {
       const own = budget.settings.categorie[p.dest];
-      const list = own.includes(p.categoria) || !p.categoria ? own : [...own, p.categoria];
+      const all = catList(imp, p.dest);
+      const list = all.includes(p.categoria) || !p.categoria ? all : [...all, p.categoria];
       cat = `<select data-imp-cat aria-label="Categoria" ${dis}>${list.map(c => `<option value="${esc(c)}" ${c === p.categoria ? 'selected' : ''}>${esc(c)}${own.includes(c) ? '' : ' (nuova)'}</option>`).join('')}<option value="__new">+ Nuova categoria…</option></select>`;
     } else if (p.dest === 'prelievo') {
       cat = `<select data-imp-cat aria-label="Da quale fondo" ${dis}>${budget.settings.categorie.ris.map(c => `<option value="${esc(c)}" ${c === p.categoria ? 'selected' : ''}>${esc(c)} · ${eur(budget.fundBalance('ris', c))}</option>`).join('')}</select>`;
@@ -1912,6 +1998,8 @@
       if (focusSel) { const el = body.querySelector(`[data-i="${idxs[0]}"] ${focusSel}`); if (el) el.focus(); }
     };
     const rowOf = el => { const li = el.closest('[data-i]'); return li ? Number(li.dataset.i) : -1; };
+    // con una categoria nuova vanno aggiornati i menu di tutte le righe visibili
+    const withVisible = idxs => [...new Set([...idxs, ...[...body.querySelectorAll('[data-i]')].map(li => Number(li.dataset.i))])];
 
     root.addEventListener('click', e => {
       const b = e.target.closest('[data-imp]');
@@ -1935,14 +2023,21 @@
       if (i < 0) return;
       const p = imp.proposte[i];
       if (el.matches('[data-imp-dest]')) {
-        redraw(changeRow(imp, i, el.value, defaultCat(p, el.value)), '[data-imp-dest]');
+        const dest = el.value, categoria = defaultCat(p, dest);
+        const added = (dest === 'nec' || dest === 'des') && addCategory(imp, dest, categoria);
+        const changed = changeRow(imp, i, dest, categoria);
+        redraw(added ? withVisible(changed) : changed, '[data-imp-dest]');
       } else if (el.matches('[data-imp-cat]')) {
-        let categoria = el.value;
+        let categoria = el.value, added = false;
         if (categoria === '__new') {
-          categoria = (prompt(`Nome della nuova categoria in ${DIV[p.dest].nome}:`) || '').trim().slice(0, 40);
-          if (!categoria) { el.value = p.categoria; return; }
+          const nome = (prompt(`Nome della nuova categoria in ${DIV[p.dest].nome}:`) || '').trim().slice(0, 40);
+          if (!nome) { el.value = p.categoria; return; }
+          // se esiste già (anche con maiuscole diverse) si usa quella
+          categoria = catList(imp, p.dest).find(c => c.toLowerCase() === nome.toLowerCase()) || nome;
+          added = addCategory(imp, p.dest, categoria);
         }
-        redraw(changeRow(imp, i, p.dest, categoria), '[data-imp-cat]');
+        const changed = changeRow(imp, i, p.dest, categoria);
+        redraw(added ? withVisible(changed) : changed, '[data-imp-cat]');
       } else if (el.matches('[data-imp-ricorda]')) p.ricorda = el.checked;
       else if (el.matches('[data-imp-ricorrente]')) p.ricorrente = el.checked;
     });
@@ -1958,14 +2053,27 @@
     if (!$dialog.open) $dialog.showModal();
   }
 
-  /** Registra i movimenti scelti nei mesi, salva regole e movimenti visti. Si può annullare dal toast. */
+  /** Riga del registro dell'import: cosa è successo al movimento, leggibile anche aprendo il file. */
+  function logRecord(p, il) {
+    const base = { data: p.data, importo: p.importo, descrizione: p.descrizione.trim() || p.descOrig, il };
+    return p.dest === 'escludi'
+      ? { esito: 'scartato', motivo: p.toccato ? 'Escluso da te' : p.motivo, ...base }
+      : { esito: 'importato', dove: destLabel(p.dest, p.categoria), ...base };
+  }
+
+  /** Registra i movimenti scelti nei mesi, salva regole e registro dell'import. Si può annullare dal toast. */
   function applyBankImport(imp) {
     const s = budget.settings;
     const rows = imp.proposte.filter(p => !p.bloccato);
     const before = JSON.parse(JSON.stringify({ categorie: s.categorie, import: s.import }));
+    const logsBefore = {};
+    const il = isoToday();
     const added = [];
     for (const p of rows) {
-      s.import.visti[p.rif] = p.dataContabile;
+      const k = BankImport.logMonth(p.rif);
+      if (!(k in logsBefore)) logsBefore[k] = { ...(state.importLogs[k] || {}) };
+      (state.importLogs[k] || (state.importLogs[k] = {}))[p.rif] = logRecord(p, il);
+      state.dirtyImport.add(k);
       if (p.dest === 'escludi') continue;
       const mo = budget.ensureMonth(p.y, p.m);
       const item = { id: Model.newId(), data: p.data, descrizione: p.descrizione.trim() || p.descOrig, ricorrente: !!p.ricorrente };
@@ -1987,9 +2095,6 @@
     }
     s.import.conti.intestatari = [...new Set([...s.import.conti.intestatari, ...imp.intestatari])];
     s.import.conti.iban = [...new Set([...s.import.conti.iban, ...imp.iban])];
-    // i riferimenti vecchi non servono più: le banche esportano al massimo qualche mese indietro
-    const limit = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10);
-    for (const [k, d] of Object.entries(s.import.visti)) if (d < limit) delete s.import.visti[k];
     markSettings();
 
     if (!added.length) { render(); toast('Nessun movimento importato: le esclusioni sono state salvate.'); return; }
@@ -2013,6 +2118,7 @@
           }
           budget.settings.categorie = before.categorie;
           budget.settings.import = before.import;
+          for (const [k, log] of Object.entries(logsBefore)) { state.importLogs[k] = log; state.dirtyImport.add(k); }
           markDirty(firstY);
           markSettings();
           render();
@@ -2029,10 +2135,30 @@
     download(Model.fileName(y), Model.yearToXlsx(budget, y, y === t.y ? t.m : null), XLSX_MIME);
   }
 
-  function exportAll() {
+  async function exportAll() {
     const files = budget.years().map(y => ({ name: Model.fileName(y), data: Model.yearToXlsx(budget, y) }));
     files.push({ name: 'impostazioni.json', data: JSON.stringify(budget.settings, null, 2) });
+    try {
+      const logs = await allImportLogs();
+      for (const k of Object.keys(logs).sort()) {
+        if (Object.keys(logs[k]).length) files.push({ name: `${Store.IMPORT_DIR}/${k}.json`, data: Store.logToJson(logs[k]) });
+      }
+    } catch (e) {
+      console.error(e);
+      toast('Nel backup mancano i movimenti già importati: ' + describeError(e), { error: true });
+    }
     download(`Hose_backup_${isoToday()}.zip`, XlsxLite.zip(files), 'application/zip');
+  }
+
+  /** Dal backup: il registro dell'import di un mese si unisce a quello che c'è già. */
+  async function restoreImportLog(key, text) {
+    let log;
+    try { log = JSON.parse(text); } catch { return false; }
+    if (!log || typeof log !== 'object' || Array.isArray(log)) return false;
+    await loadImportLogs([key]);
+    state.importLogs[key] = { ...state.importLogs[key], ...log };
+    state.dirtyImport.add(key);
+    return true;
   }
 
   function copyRecurring(y, m) {
@@ -2147,10 +2273,18 @@
         break;
       }
       case 'change-folder': await chooseFolder(); break;
-      case 'use-browser':
+      case 'use-browser': {
         if (!confirm('Passare al salvataggio nel browser? I dati attuali verranno copiati nel browser e la cartella non sarà più aggiornata.')) break;
+        let logs;
+        try { logs = await allImportLogs(); } catch (err) {
+          toast('Non riesco a leggere i movimenti già importati della cartella: ' + describeError(err), { error: true });
+          break;
+        }
         Store.useBrowser();
         Store.saveBrowser(budget.toJSON());
+        Store.replaceBrowserLogs(logs);
+        state.importLogs = logs;
+        state.dirtyImport.clear();
         state.dirtyYears.clear();
         state.dirtySettings = false;
         state.saveState = 'saved';
@@ -2158,6 +2292,7 @@
         render();
         toast('Ora i dati vengono salvati nel browser.');
         break;
+      }
       case 'import': $import.value = ''; $import.click(); break;
       case 'import-bank': $bankInput.value = ''; $bankInput.click(); break;
       case 'del-rule':
@@ -2167,11 +2302,15 @@
         toast(`Regola per «${el.dataset.key}» eliminata.`);
         break;
       case 'reset-visti': {
-        const n = Object.keys(budget.settings.import.visti).length;
-        if (!confirm(`Dimenticare i ${n} movimenti già importati o scartati?\n\nSe reimporti un elenco che li contiene, verranno proposti di nuovo: attenzione ai doppioni.`)) break;
-        budget.settings.import.visti = {};
-        markSettings();
-        render();
+        if (!confirm('Dimenticare tutti i movimenti già importati o scartati?\n\nSe reimporti un elenco che li contiene, verranno proposti di nuovo: attenzione ai doppioni.')) break;
+        try {
+          const keys = Object.keys(await allImportLogs());
+          for (const k of keys) { state.importLogs[k] = {}; state.dirtyImport.add(k); }
+          if (keys.length) scheduleSave();
+          toast(keys.length ? 'Fatto: i prossimi import riproporranno tutti i movimenti.' : 'Non c\'erano movimenti registrati.');
+        } catch (err) {
+          toast('Non riesco a leggere i movimenti già importati: ' + describeError(err), { error: true });
+        }
         break;
       }
       case 'export-xlsx': exportYear(Number(document.querySelector('[data-export-year]').value)); break;

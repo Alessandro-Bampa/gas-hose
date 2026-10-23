@@ -94,11 +94,12 @@
   /**
    * Impostazioni dell'import dalla banca:
    *   regole: { CHIAVE ESERCENTE: { dest, categoria } } — imparate dalle correzioni
-   *   visti:  { rif: 'AAAA-MM-GG' } — movimenti già importati o scartati, da non riproporre
    *   conti:  { intestatari, iban } — del titolare, per riconoscere i giroconti
+   * I movimenti già importati stanno nei file import/AAAA-MM.json (vedi store.js); il vecchio
+   * campo `visti` resta solo finché app.js non li ha spostati lì.
    */
   function normalizeImport(s) {
-    const out = { regole: {}, visti: {}, conti: { intestatari: [], iban: [] } };
+    const out = { regole: {}, conti: { intestatari: [], iban: [] } };
     if (!s || typeof s !== 'object') return out;
     if (s.regole && typeof s.regole === 'object') {
       for (const [k, r] of Object.entries(s.regole)) {
@@ -106,9 +107,7 @@
         out.regole[k] = r.categoria ? { dest: r.dest, categoria: String(r.categoria) } : { dest: r.dest };
       }
     }
-    if (s.visti && typeof s.visti === 'object') {
-      for (const [k, d] of Object.entries(s.visti)) if (/^\d{4}-\d{2}-\d{2}$/.test(d)) out.visti[k] = d;
-    }
+    if (s.visti && typeof s.visti === 'object' && Object.keys(s.visti).length) out.visti = { ...s.visti };
     const strings = a => (Array.isArray(a) ? uniq(a.map(x => String(x).trim()).filter(Boolean)) : []);
     if (s.conti) {
       out.conti.intestatari = strings(s.conti.intestatari);

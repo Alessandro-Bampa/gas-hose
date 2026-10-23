@@ -300,7 +300,7 @@
     ['nec', 'Tasse e commissioni', 'BOLLI GOVERNATIVI|IMPOSTA DI BOLLO|COMMISSION|CANONE CONTO|SPESE TENUTA|F24\\b|AGENZIA ENTRATE|PAGOPA|TARI\\b|IMU\\b'],
     ['des', 'Abbonamenti per servizi di intrattenimento (Netflix, HBO, Spotify)', 'NETFLIX|SPOTIFY|DISNEY|DAZN|NOW TV|NOWTV|SKY\\b|PRIME VIDEO|AMAZON PRIME|GOOGLE|YOUTUBE|APPLE|ITUNES|ANTHROPIC|CLAUDE|OPENAI|CHATGPT|STEAM|PLAYSTATION|XBOX|NINTENDO|AUDIBLE|PARAMOUNT|TIMVISION|CRUNCHYROLL'],
     ['des', 'Abbonamenti in palestra', 'PALESTR|FITNESS|GYM\\b|MCFIT|VIRGIN ACTIVE|PISCIN|CROSSFIT'],
-    ['des', 'Cene fuori', 'RISTORANT|TRATTORI|OSTERI|PIZZERI|PIADIN|BAR\\b|CAFFE|CAFE\\b|PUB\\b|SUSHI|BIRRERI|BIRRIFICI|GELATERI|PASTICCERI|ENOTEC|BRACERI|PANINOTEC|KEBAB|AGRITURISM|BISTROT|TAVERN|LOCANDA|ROSTICCERI|SNACK|JUST EAT|JUSTEAT|DELIVEROO|GLOVO|MCDONALD|BURGER|ROADHOUSE|OLD WILD WEST|STARBUCKS|AUTOGRILL'],
+    ['des', 'Pranzi - Cene - Aperitivi', 'RISTORANT|TRATTORI|OSTERI|PIZZERI|PIADIN|BAR\\b|CAFFE|CAFE\\b|PUB\\b|SUSHI|BIRRERI|BIRRIFICI|GELATERI|PASTICCERI|ENOTEC|BRACERI|PANINOTEC|KEBAB|AGRITURISM|BISTROT|TAVERN|LOCANDA|ROSTICCERI|SNACK|JUST EAT|JUSTEAT|DELIVEROO|GLOVO|MCDONALD|BURGER|ROADHOUSE|OLD WILD WEST|STARBUCKS|AUTOGRILL'],
     ['des', 'Shopping e abbigliamento', 'DECATHLON|ZARA\\b|OVS\\b|AMAZON|AMZN|ZALANDO|PRIMARK|UNIQLO|BERSHKA|STRADIVARIUS|CALZEDONIA|INTIMISSIMI|TEZENIS|FOOT LOCKER|NIKE\\b|ADIDAS|MEDIAWORLD|MEDIA WORLD|UNIEURO|EURONICS|IKEA\\b|LEROY MERLIN|SHEIN|TEMU\\b|ALIEXPRESS|EBAY|DOUGLAS|SEPHORA|KIKO\\b|FELTRINELLI|MONDADORI|LIBRERI'],
     ['des', 'Cura della persona', 'BARBER|BARBIERE|PARRUCCHIER|ACCONCIATUR|ESTETIC|NAILS\\b|CENTRO BENESSERE'],
   ].map(([div, categoria, words, opts]) => ({ div, categoria, re: new RegExp('\\b(?:' + words + ')'), ...(opts || {}) }));
@@ -334,14 +334,21 @@
     return null;
   }
 
+  /** Mese ('AAAA-MM') del registro dell'import in cui va un movimento: quello della data contabile del rif. */
+  function logMonth(rif) {
+    const d = String(rif).split('|')[1] || '';
+    return /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : null;
+  }
+
   /**
-   * Proposte per i movimenti dei file letti con load().
+   * Proposte per i movimenti dei file letti con load(). visti: { rif: record } dei movimenti
+   * già importati o scartati (i registri dei mesi toccati).
    * → { proposte, giaImportati, nonContabilizzati, intestatari, iban }
    * Ogni proposta: { ...movimento, y, m, dest, categoria, dubbio, motivo, origine, ricorrente }
    *   dest: 'nec' | 'des' (spesa, o rimborso se l'importo è positivo) | 'entrata' | 'prelievo'
    *         (categoria = fondo dei Risparmi) | 'escludi'
    */
-  function analyze(files, budget) {
+  function analyze(files, budget, visti = {}) {
     const s = budget.settings;
     const imp = s.import;
     const intestatari = [...new Set(files.flatMap(f => f.intestatari))];
@@ -354,7 +361,7 @@
     let giaImportati = 0;
     const nuovi = [];
     for (const f of files) for (const mv of f.movimenti) {
-      if (imp.visti[mv.rif]) giaImportati++;
+      if (visti[mv.rif]) giaImportati++;
       else nuovi.push(mv);
     }
 
@@ -418,5 +425,5 @@
     return { proposte, giaImportati, nonContabilizzati, intestatari, iban };
   }
 
-  global.BankImport = { BANKS, SOGLIA_PRELIEVO, DEFAULT, load, analyze, learnable, parseCsv, toIso, makeKey };
+  global.BankImport = { BANKS, SOGLIA_PRELIEVO, DEFAULT, load, analyze, logMonth, learnable, parseCsv, toIso, makeKey };
 })(window);

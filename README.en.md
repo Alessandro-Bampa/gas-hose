@@ -69,6 +69,8 @@ dati/
   Hose_2025.xlsx          ← one file per year
   Hose_2026.xlsx
   impostazioni.json       ← default percentages, categories, goals, import rules
+  import/
+    2026-08.json          ← bank transactions already imported or discarded, one file per month
 ```
 
 Files are updated automatically on every change (top right you'll see «Salvato alle …», saved at
@@ -223,9 +225,20 @@ merchant (e.g. «CONESTOGA NO LOUNGE → Svago › Cene fuori») and uses it in 
 are listed, and can be deleted, in *Impostazioni › Import dalla banca*.
 
 **No duplicates.** Transactions already imported or discarded are not offered again if you
-re-import the same period (even switching between ING's `.csv` and `.xlsx`). If you had entered
-the month's expenses by hand as totals (e.g. «Spesa alimentare 250 €»), the summary points it out:
-delete them after the import so they aren't counted twice.
+re-import the same period (even switching between ING's `.csv` and `.xlsx`). Hose records them in
+the `import/` folder, one file per month of the booking date (`import/2026-08.json`), one
+transaction per line: what happened to it (imported and where, or discarded and why). Each import
+only reads the months it touches; if a month has no file yet, all its transactions are new. In the
+browser the same list is kept in browser storage. The `.zip` backup includes it.
+
+Each transaction is identified by bank, booking date, amount and a code derived from the bank's
+text (e.g. `ING|2026-08-04|-8.20|1x2y3z`), so two identical expenses on the same day stay distinct.
+The holders and IBANs of your accounts, read from the transaction lists and saved in the settings,
+are used to recognise transfers between your own accounts even when the description doesn't say
+«giroconto».
+
+If you had entered the month's expenses by hand as totals (e.g. «Spesa alimentare 250 €»), the
+summary points it out: delete them after the import so they aren't counted twice.
 
 ## Other features
 

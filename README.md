@@ -67,6 +67,8 @@ dati/
   Hose_2025.xlsx          ← un file per anno
   Hose_2026.xlsx
   impostazioni.json       ← percentuali predefinite, categorie, obiettivi, regole dell'import
+  import/
+    2026-08.json          ← movimenti della banca già importati o scartati, un file per mese
 ```
 
 I file vengono aggiornati in automatico a ogni modifica (in alto a destra vedi «Salvato alle …»).
@@ -210,9 +212,20 @@ quell'esercente (es. «CONESTOGA NO LOUNGE → Svago › Cene fuori») e la usa 
 regole si vedono e si eliminano in *Impostazioni › Import dalla banca*.
 
 **Niente doppioni.** I movimenti già importati o scartati non vengono riproposti se reimporti lo
-stesso periodo (anche passando dal `.csv` all'`.xlsx` di ING). Se nel mese avevi inserito le spese
-a mano come totali (es. «Spesa alimentare 250 €»), il riepilogo te lo segnala: eliminale dopo
-l'import per non contarle due volte.
+stesso periodo (anche passando dal `.csv` all'`.xlsx` di ING). Hose li registra nella cartella
+`import/`, un file per mese della data contabile (`import/2026-08.json`), con un movimento per riga:
+cosa ne è stato (importato e dove, oppure scartato e perché). A ogni import legge solo i mesi
+toccati; se un mese non ha ancora il file, i suoi movimenti sono tutti nuovi. Nel browser lo
+stesso elenco sta nella memoria del browser. Il backup `.zip` lo comprende.
+
+Ogni movimento è identificato da banca, data contabile, importo e un codice ricavato dal testo
+della banca (es. `ING|2026-08-04|-8.20|1x2y3z`): così due spese uguali nello stesso giorno restano
+distinte. Gli intestatari e gli IBAN dei tuoi conti, letti dagli elenchi movimenti e salvati nelle
+impostazioni, servono a riconoscere i giroconti tra i tuoi conti anche quando la causale non dice
+«giroconto».
+
+Se nel mese avevi inserito le spese a mano come totali (es. «Spesa alimentare 250 €»), il
+riepilogo te lo segnala: eliminale dopo l'import per non contarle due volte.
 
 ## Altre funzioni
 
