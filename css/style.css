@@ -157,7 +157,15 @@ p { margin: 0; }
 .save-status .dot.saved { background: var(--pos); }
 .save-status .dot.pending, .save-status .dot.saving { background: var(--warn); }
 .save-status .dot.error { background: var(--neg); }
-body.gated .tabs, body.gated .save-status { visibility: hidden; }
+.nav-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 38px; height: 38px; border-radius: 50%;
+  color: var(--ink-2); text-decoration: none;
+}
+.nav-icon:hover { background: var(--hover); color: var(--ink); }
+.nav-icon.active { background: var(--ink); color: var(--bg); }
+.nav-icon .ic { width: 20px; height: 20px; }
+body.gated .tabs, body.gated .save-status, body.gated .nav-icon { visibility: hidden; }
 
 /* ------------------------------------------------------------------ layout */
 
