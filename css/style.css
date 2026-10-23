@@ -288,6 +288,7 @@ body.gated .tabs, body.gated .save-status, body.gated .nav-icon { visibility: hi
 
 .meter { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-top: 10px; }
 .meter > span { display: block; height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.division > .meter { padding: 0; margin-left: 18px; margin-right: 18px; }
 .div-nec .meter { background: var(--nec-soft); } .div-nec .meter > span { background: var(--nec); }
 .div-des .meter { background: var(--des-soft); } .div-des .meter > span { background: var(--des); }
 .div-ris .meter, .meter.ris { background: var(--ris-soft); } .div-ris .meter > span, .meter.ris > span { background: var(--ris); }
