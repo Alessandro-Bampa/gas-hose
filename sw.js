@@ -6,14 +6,16 @@
  * transitano mai dal service worker (restano nella cartella scelta o nel browser).
  * Se cambi l'elenco dei file, aumenta il numero di versione di CACHE.
  */
-const CACHE = 'hose-v1';
+const CACHE = 'hose-v2';
 const FILES = [
   './',
   'index.html',
   'manifest.webmanifest',
   'css/style.css',
   'js/xlsx-lite.js',
+  'js/xls-lite.js',
   'js/model.js',
+  'js/bank-import.js',
   'js/store.js',
   'js/charts.js',
   'js/app.js',

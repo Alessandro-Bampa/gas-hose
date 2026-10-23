@@ -68,7 +68,7 @@ next save will overwrite the changes made elsewhere.
 dati/
   Hose_2025.xlsx          ← one file per year
   Hose_2026.xlsx
-  impostazioni.json       ← default percentages, categories, goals
+  impostazioni.json       ← default percentages, categories, goals, import rules
 ```
 
 Files are updated automatically on every change (top right you'll see «Salvato alle …», saved at
@@ -176,6 +176,57 @@ added to the long trip's goal.
 On the month page, the Svago and Risparmi cards show the instalments due, with a button to add
 them in one tap.
 
+## Importing transactions from the bank
+
+Instead of entering expenses by hand you can load the transaction list downloaded from your bank:
+the **«Importa movimenti»** (import transactions) button on the month page, or *Impostazioni ›
+Dati e file*.
+
+| Bank | File |
+|---|---|
+| **ING** | `.xlsx` or `.csv` (same transactions: either one works) |
+| **BPER** | `.xls`, as downloaded |
+
+The bank and the format are recognised from the file's content, so you don't pick them. You can
+load several files at once (e.g. ING and BPER).
+
+**How transactions are sorted.** Each transaction goes to the month of its date (the value date:
+for card payments it is the day of the purchase) and gets a destination:
+
+- **Necessità** or **Svago**, with a category, for expenses. A credit on the card (e.g. a return)
+  is a **refund** and reduces the category's spending.
+- **Entrata** (income) for salary and other credits.
+- **Prelievo dai Risparmi** (withdrawal from savings), suggested for expenses of **€500** or more
+  (e.g. a deposit, an insurance policy): if you paid them with money set aside, they don't weigh
+  on the month's budget.
+- **Escludi** (exclude) for transfers between your own accounts (ING and BPER included),
+  operations cancelled by the bank (reversals) and transactions already in the month (same amount,
+  close date).
+
+The import never creates savings contributions. To decide it uses, in this order: the special
+cases above, **rules learned** from your corrections, and a list of known merchants (supermarkets,
+fuel, tolls, phone, restaurants, subscriptions…).
+
+**Before saving** you see a summary by destination and by month, and choose:
+
+- **Importa così** (import as is): uses the suggestions. Uncertain transactions go to Svago › Altro
+  (or as suggested).
+- **Rivedi i movimenti** (review): the list with the **uncertain ones at the top, in yellow with
+  ⚠**. For each transaction you change destination and category. Tap it to see the details:
+  description, the bank's original text, «Ricorda per i prossimi import» (remember for next
+  imports). Changing a merchant updates the other transactions from the same merchant.
+
+After the import a message lets you **undo** it.
+
+**Learns from corrections.** When you correct a transaction, Hose remembers the choice for that
+merchant (e.g. «CONESTOGA NO LOUNGE → Svago › Cene fuori») and uses it in the next imports. Rules
+are listed, and can be deleted, in *Impostazioni › Import dalla banca*.
+
+**No duplicates.** Transactions already imported or discarded are not offered again if you
+re-import the same period (even switching between ING's `.csv` and `.xlsx`). If you had entered
+the month's expenses by hand as totals (e.g. «Spesa alimentare 250 €»), the summary points it out:
+delete them after the import so they aren't counted twice.
+
 ## Other features
 
 - **Recurring items**: mark salary, rent, subscriptions… as recurring. When you open an empty
@@ -186,7 +237,7 @@ them in one tap.
   an expense. Removing a category doesn't delete the items already recorded.
 - **Import / Export** (*Impostazioni › Dati e file*, settings › data and files): Excel for one
   year, CSV of transactions, full `.zip` backup (all years + settings), which can be imported on
-  another device.
+  another device. «Importa» also accepts the bank's transaction lists.
 - **← → arrow keys** to move between months.
 - Light/dark theme and a layout that also works on phones.
 
@@ -199,7 +250,9 @@ sw.js                  service worker: offline support
 icons/                 app icons
 css/style.css
 js/xlsx-lite.js        reads/writes .xlsx files (no external libraries)
+js/xls-lite.js         reads old .xls files (BIFF8), for BPER transaction lists
 js/model.js            50/30/20 maths, leftovers, savings, goals, Excel file format
+js/bank-import.js      bank transaction import: reading, recognition, sorting
 js/store.js            storage in a folder or in the browser
 js/charts.js           charts
 js/app.js              user interface
@@ -215,4 +268,4 @@ dati/                  your data: excluded from Git (.gitignore), never publish 
 
 After an update, the installed app downloads the new version the first time it's opened with a
 connection. If you change the list of app files, bump the version in `sw.js`
-(`const CACHE = 'hose-v1'`).
+(`const CACHE = 'hose-v2'`).

@@ -66,7 +66,7 @@ salvataggio successivo sovrascrive le modifiche fatte altrove.
 dati/
   Hose_2025.xlsx          ← un file per anno
   Hose_2026.xlsx
-  impostazioni.json       ← percentuali predefinite, categorie, obiettivi
+  impostazioni.json       ← percentuali predefinite, categorie, obiettivi, regole dell'import
 ```
 
 I file vengono aggiornati in automatico a ogni modifica (in alto a destra vedi «Salvato alle …»).
@@ -167,6 +167,53 @@ categoria). Una spesa normale, anche nella stessa categoria (es. un weekend fuor
 Nella pagina del mese, le schede Svago e Risparmi mostrano le rate da versare, con un pulsante
 per aggiungerle al volo.
 
+## Importare i movimenti dalla banca
+
+Invece di inserire le spese a mano puoi caricare l'elenco movimenti scaricato dalla banca:
+pulsante **«Importa movimenti»** nella pagina del mese, oppure *Impostazioni › Dati e file*.
+
+| Banca | File |
+|---|---|
+| **ING** | `.xlsx` oppure `.csv` (stessi movimenti: puoi usare l'uno o l'altro) |
+| **BPER** | `.xls`, così come lo scarichi |
+
+La banca e il formato si riconoscono dal contenuto del file, quindi non devi sceglierli. Puoi
+caricare più file insieme (es. ING e BPER).
+
+**Come vengono smistati.** Ogni movimento va nel mese della sua data (la data valuta: per i
+pagamenti con carta è il giorno dell'acquisto) e riceve una destinazione:
+
+- **Necessità** o **Svago**, con categoria, per le uscite. Un accredito su carta (es. un reso) è un
+  **rimborso** e riduce le spese della categoria.
+- **Entrata** per lo stipendio e gli altri accrediti.
+- **Prelievo dai Risparmi**, proposto per le uscite di **500 €** o più (es. caparra, polizza): se
+  le hai pagate con i soldi messi da parte, così non pesano sul budget del mese.
+- **Escludi** per i giroconti tra i tuoi conti (anche tra ING e BPER), le operazioni annullate
+  dalla banca (storni) e i movimenti già presenti nel mese (stesso importo, data vicina).
+
+L'import non crea mai accantonamenti nei Risparmi. Per decidere usa, in quest'ordine: i casi
+speciali qui sopra, le **regole imparate** dalle tue correzioni e un elenco di esercenti noti
+(supermercati, carburante, pedaggi, telefono, ristoranti, abbonamenti…).
+
+**Prima di salvare** vedi un riepilogo per destinazione e per mese, e scegli:
+
+- **Importa così**: usa le proposte. I movimenti dubbi vanno in Svago › Altro (o come proposto).
+- **Rivedi i movimenti**: l'elenco con i **dubbi in cima, in giallo con ⚠**. Per ogni movimento
+  cambi la destinazione e la categoria. Toccandolo vedi il dettaglio: descrizione, testo originale
+  della banca, «Ricorda per i prossimi import». Se cambi un esercente, gli altri movimenti dello
+  stesso esercente si aggiornano.
+
+Dopo l'import un messaggio permette di **annullarlo**.
+
+**Impara dalle correzioni.** Quando correggi un movimento, Hose ricorda la scelta per
+quell'esercente (es. «CONESTOGA NO LOUNGE → Svago › Cene fuori») e la usa nei prossimi import. Le
+regole si vedono e si eliminano in *Impostazioni › Import dalla banca*.
+
+**Niente doppioni.** I movimenti già importati o scartati non vengono riproposti se reimporti lo
+stesso periodo (anche passando dal `.csv` all'`.xlsx` di ING). Se nel mese avevi inserito le spese
+a mano come totali (es. «Spesa alimentare 250 €»), il riepilogo te lo segnala: eliminale dopo
+l'import per non contarle due volte.
+
 ## Altre funzioni
 
 - **Voci ricorrenti**: segna come ricorrenti stipendio, affitto, abbonamenti… Quando apri un mese
@@ -177,6 +224,7 @@ per aggiungerle al volo.
   spesa. Rimuovere una categoria non cancella le voci già registrate.
 - **Importa / Esporta** (*Impostazioni › Dati e file*): Excel di un anno, CSV dei movimenti,
   backup completo `.zip` (tutti gli anni + impostazioni), importabile su un altro dispositivo.
+  «Importa» accetta anche gli elenchi movimenti della banca.
 - **Frecce ← →** della tastiera per passare da un mese all'altro.
 - Tema chiaro/scuro e layout adatto anche al telefono.
 
@@ -189,7 +237,9 @@ sw.js                  service worker: funzionamento offline
 icons/                 icone dell'app
 css/style.css
 js/xlsx-lite.js        lettura/scrittura dei file .xlsx (senza librerie esterne)
+js/xls-lite.js         lettura dei vecchi file .xls (BIFF8), per gli elenchi movimenti BPER
 js/model.js            calcoli 50/30/20, avanzi, risparmi, obiettivi, formato del file Excel
+js/bank-import.js      import dei movimenti della banca: lettura, riconoscimento, smistamento
 js/store.js            salvataggio su cartella o nel browser
 js/charts.js           grafici
 js/app.js              interfaccia
@@ -205,4 +255,4 @@ dati/                  i tuoi dati: esclusi da Git (.gitignore), non vanno mai p
 
 Dopo un aggiornamento, l'app installata scarica la nuova versione alla prima apertura con
 connessione. Se cambi l'elenco dei file dell'app, aumenta la versione in `sw.js`
-(`const CACHE = 'hose-v1'`).
+(`const CACHE = 'hose-v2'`).

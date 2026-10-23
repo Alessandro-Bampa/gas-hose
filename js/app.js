@@ -12,6 +12,7 @@
   const $dialog = document.getElementById('dialog');
   const $status = document.getElementById('save-status');
   const $import = document.getElementById('import-input');
+  const $bankInput = document.getElementById('bank-input');
   let tooltip = null;
 
   const state = {
@@ -75,6 +76,8 @@
     check: '<path d="M20 6 9 17l-5-5"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    bank: '<path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M12 2 20 7H4z"/>',
   };
   const icon = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 
@@ -366,6 +369,7 @@
       <div class="month-title"><h1>${MESI[m]} <span>${y}</span></h1>${isNow ? '<span class="pill now">Mese corrente</span>' : ''}</div>
       <a class="icon-btn" href="${monthHref(next.y, next.m)}" aria-label="Mese successivo" title="${monthLabel(next.y, next.m)}">${icon('right')}</a>
       <div class="month-tools">
+        <button class="btn ghost sm" data-action="import-bank" title="Carica l'elenco movimenti della banca (ING, BPER)">${icon('bank')} Importa movimenti</button>
         ${isNow ? '' : '<a class="btn ghost sm" href="#/">Torna al mese corrente</a>'}
         <input type="month" class="month-jump" value="${y}-${pad(m + 1)}" data-change="jump-month" aria-label="Vai a un mese">
       </div>
@@ -849,6 +853,8 @@
     const theme = (() => { try { return localStorage.getItem('salvadanaio.theme') || 'auto'; } catch { return 'auto'; } })();
     const t = today();
     const years = [...new Set([...budget.years(), t.y])].sort((a, b) => a - b);
+    const rules = Object.entries(budget.settings.import.regole).sort((a, b) => a[0].localeCompare(b[0]));
+    const nVisti = Object.keys(budget.settings.import.visti).length;
 
     let storage;
     if (Store.mode === 'folder') {
@@ -893,8 +899,11 @@
     <h2 class="section-title">Dati e file</h2>
     <section class="card">
       ${storage}
+      <div class="data-row">${icon('bank')}<div class="grow"><strong>Movimenti della banca</strong>
+        <p>Elenco movimenti di ING (.xlsx o .csv) o BPER (.xls): Hose li smista nei mesi e tra Necessità e Svago, e prima di salvare puoi controllarli.</p></div>
+        <button class="btn" data-action="import-bank">Scegli file…</button></div>
       <div class="data-row">${icon('upload')}<div class="grow"><strong>Importa</strong>
-        <p>File Excel di un anno (Hose_AAAA.xlsx), backup completo (.zip) o impostazioni (.json).</p></div>
+        <p>File Excel di un anno (Hose_AAAA.xlsx), backup completo (.zip), impostazioni (.json) o movimenti della banca.</p></div>
         <button class="btn" data-action="import">Scegli file…</button></div>
       <div class="data-row">${icon('download')}<div class="grow"><strong>Esporta</strong>
         <p>Scarica una copia dei dati: Excel dell'anno, CSV dei movimenti o un backup .zip con tutto.</p></div>
@@ -902,6 +911,16 @@
         <button class="btn" data-action="export-xlsx">Excel</button>
         <button class="btn" data-action="export-csv">CSV</button>
         <button class="btn primary" data-action="export-all">${icon('download')} Backup completo</button></div>
+    </section>
+
+    <h2 class="section-title">Import dalla banca</h2>
+    <section class="card">
+      <p class="muted small">Quando nella revisione di un import correggi un movimento, Hose ricorda la scelta per quell'esercente e la usa nei prossimi import. Qui puoi togliere le regole sbagliate.</p>
+      ${rules.length
+        ? `<ul class="cat-list" style="margin:10px 0 0">${rules.map(([k, r]) => `<li><span title="${esc(k)}">${esc(k)}</span><small>${esc(destLabel(r.dest, r.categoria))}</small>
+            <button class="icon-btn sm" data-action="del-rule" data-key="${esc(k)}" aria-label="Elimina la regola per ${esc(k)}" title="Elimina">${icon('x')}</button></li>`).join('')}</ul>`
+        : '<p class="muted" style="margin-top:10px">Nessuna regola salvata.</p>'}
+      ${nVisti ? `<p class="muted small" style="margin-top:12px">${nVisti === 1 ? '1 movimento già importato o scartato non viene riproposto' : `${nVisti} movimenti già importati o scartati non vengono riproposti`} se reimporti lo stesso file. <button class="link" data-action="reset-visti">Dimenticali</button></p>` : ''}
     </section>
 
     <h2 class="section-title">Aspetto</h2>
@@ -916,12 +935,15 @@
       <p><strong>Obiettivi.</strong> Si accantonano dallo Svago (es. un viaggio) o dai Risparmi (es. la caldaia) e hanno un <strong>fondo tutto loro</strong>: non rientrano negli avanzi né nei risparmi accumulati, e contano solo le rate e quanto destini a loro. La <strong>rata è fissa</strong>: se sei in anticipo l'app propone di ridurla o di anticipare la scadenza, se sei indietro di aumentarla o di spostare la scadenza. I soldi di un obiettivo si usano solo con «Usa il fondo».</p>
       <p>Il <strong>delta</strong> di un anno è di quanto sono cambiati avanzi e risparmi accumulati. Viene salvato nel foglio «Riepilogo» del file Excel insieme ai valori di inizio anno, così ogni file resta coerente anche da solo.</p>
       <p>Le voci <strong>ricorrenti</strong> (affitto, stipendio, abbonamenti…) si possono copiare con un clic nel mese successivo.</p>
+      <p>Con <strong>Importa movimenti</strong> carichi l'elenco movimenti della banca (ING, BPER): ogni movimento va nel mese della sua data, in Necessità o Svago, tra le entrate o, per le spese grandi, come prelievo dai risparmi. Giroconti tra i tuoi conti e operazioni annullate vengono esclusi. Prima di salvare vedi il riepilogo e puoi correggere i movimenti: i dubbi sono in cima, in giallo.</p>
     </section>`;
   }
 
   /* ================================================================ dialoghi */
 
   function openDialog(html, onSubmit, onOpen) {
+    $dialog.classList.remove('wide');
+    delete $dialog.dataset.sticky;
     $dialog.innerHTML = html;
     const form = $dialog.querySelector('form');
     form.addEventListener('submit', e => {
@@ -942,7 +964,12 @@
     if (onOpen) onOpen(form);
   }
 
-  $dialog.addEventListener('click', e => { if (e.target === $dialog) $dialog.close(); });
+  // Un dialogo "sticky" (la revisione dell'import) non si chiude con un clic fuori, e con Esc chiede conferma.
+  $dialog.addEventListener('click', e => { if (e.target === $dialog && !$dialog.dataset.sticky) $dialog.close(); });
+  $dialog.addEventListener('cancel', e => {
+    if ($dialog.dataset.sticky && !confirm('Annullare l\'import dei movimenti?')) e.preventDefault();
+  });
+  $dialog.addEventListener('close', () => { $dialog.classList.remove('wide'); delete $dialog.dataset.sticky; });
 
   /**
    * Opzioni del campo categoria. Gli obiettivi compaiono a parte ("goal:<id>"):
@@ -1607,7 +1634,7 @@
   }
 
   async function importFiles(files) {
-    const done = [];
+    const done = [], bank = [];
     for (const file of files) {
       try {
         if (/\.zip$/i.test(file.name)) {
@@ -1617,6 +1644,13 @@
             if (/\.xlsx$/i.test(base) && !base.startsWith('~$')) { const y = await importYear(base, await z.bytes(n)); if (y) done.push(String(y)); }
             else if (/^impostazioni\.json$/i.test(base) && importSettings(await z.text(n), base)) done.push('impostazioni');
           }
+        } else if (/\.(xls|csv)$/i.test(file.name) || (/\.xlsx$/i.test(file.name) && !Model.FILE_RE.test(file.name))) {
+          // movimenti della banca; un .xlsx che non è di una banca è un file di Hose rinominato
+          const buffer = await file.arrayBuffer();
+          const f = await BankImport.load(file.name, buffer);
+          if (f) bank.push(f);
+          else if (/\.xlsx$/i.test(file.name)) { const y = await importYear(file.name, buffer); if (y) done.push(String(y)); }
+          else toast(`«${file.name}» non è un elenco movimenti riconosciuto. ${BANK_HELP}`, { error: true });
         } else if (/\.xlsx$/i.test(file.name)) {
           const y = await importYear(file.name, await file.arrayBuffer());
           if (y) done.push(String(y));
@@ -1634,6 +1668,358 @@
       toast('Importato: ' + done.join(', '));
       render();
     }
+    if (bank.length) openBankImport(bank);
+  }
+
+  /* ===================================================== import dalla banca */
+
+  const BANK_HELP = 'Banche supportate: ING (.xlsx o .csv) e BPER (.xls).';
+  const itDate = s => s.split('-').reverse().join('/');
+  const fondoPredefinito = () => {
+    const f = budget.settings.categorie.ris;
+    return f.includes('Fondo di emergenza') ? 'Fondo di emergenza' : f[0] || '';
+  };
+
+  /** «Svago › Cene fuori», «Prelievo da Fondo di emergenza», «Entrata», «Escludi». */
+  function destLabel(dest, categoria) {
+    if (dest === 'nec' || dest === 'des') return `${DIV[dest].nome} › ${categoria || BankImport.DEFAULT.categoria}`;
+    if (dest === 'prelievo') return `Prelievo da ${categoria}`;
+    return dest === 'entrata' ? 'Entrata' : 'Escludi';
+  }
+
+  const daVerificare = p => p.dubbio && !p.toccato && !p.bloccato;
+  const daImportare = p => p.dest !== 'escludi' && !p.bloccato;
+
+  /** Legge i file della banca scelti dall'utente e apre la revisione. */
+  async function importBankFiles(files) {
+    const loaded = [];
+    for (const file of files) {
+      try {
+        const f = await BankImport.load(file.name, await file.arrayBuffer());
+        if (f) loaded.push(f);
+        else toast(`«${file.name}» non è un elenco movimenti riconosciuto. ${BANK_HELP}`, { error: true });
+      } catch (e) {
+        console.error(e);
+        toast(`«${file.name}» non è leggibile: ${e.message}`, { error: true });
+      }
+    }
+    if (loaded.length) openBankImport(loaded);
+  }
+
+  function openBankImport(files) {
+    const an = BankImport.analyze(files, budget);
+    if (!an.proposte.length) {
+      const n = an.giaImportati;
+      toast(n ? `Nessun movimento nuovo: ${n === 1 ? 'l\'unico movimento era già stato importato' : `i ${n} movimenti erano già stati importati`}.` : 'Nel file non ci sono movimenti da importare.');
+      return;
+    }
+    for (const p of an.proposte) {
+      Object.assign(p, { proposta: { dest: p.dest, categoria: p.categoria }, descOrig: p.descrizione, toccato: false, ricorda: false });
+      if (state.yearErrors[p.y]) p.bloccato = `Il file del ${p.y} non è leggibile: questo movimento non verrà importato`;
+    }
+    const imp = { files, ...an, fase: 'riepilogo', filtro: an.proposte.some(daVerificare) ? 'dubbi' : 'tutti', aperto: -1 };
+    bankDialog(imp);
+  }
+
+  /** Per una nuova destinazione scelta a mano: la categoria proposta, il fondo predefinito o «Altro». */
+  function defaultCat(p, dest) {
+    if (dest === p.proposta.dest) return p.proposta.categoria;
+    if (dest === 'prelievo') return fondoPredefinito();
+    return dest === 'nec' || dest === 'des' ? BankImport.DEFAULT.categoria : '';
+  }
+
+  /**
+   * Cambia destinazione/categoria di un movimento. Lo stesso vale per gli altri movimenti
+   * dello stesso esercente non ancora toccati (es. tutti i VEGA). → indici modificati
+   */
+  function changeRow(imp, i, dest, categoria) {
+    const p = imp.proposte[i];
+    Object.assign(p, { dest, categoria, toccato: true, ricorda: BankImport.learnable(p.chiave) && dest !== 'escludi' });
+    const changed = [i];
+    if (!BankImport.learnable(p.chiave)) return changed;
+    imp.proposte.forEach((q, j) => {
+      if (j === i || q.toccato || q.bloccato || q.origine === 'speciale' || q.chiave !== p.chiave || Math.sign(q.importo) !== Math.sign(p.importo)) return;
+      Object.assign(q, { dest, categoria, toccato: true });
+      changed.push(j);
+    });
+    return changed;
+  }
+
+  function impSummary(imp) {
+    const rows = imp.proposte.filter(p => !p.bloccato);
+    const tot = { nec: [0, 0], des: [0, 0], prelievo: [0, 0], entrata: [0, 0], escludi: [0, 0] };
+    for (const p of rows) {
+      const t = tot[p.dest];
+      t[0]++;
+      t[1] = r2(t[1] + (p.dest === 'nec' || p.dest === 'des' ? -p.importo : Math.abs(p.importo)));
+    }
+    const nMov = n => `${n} ${n === 1 ? 'movimento' : 'movimenti'}`;
+    const kpi = (k, label, sw) => (tot[k][0]
+      ? `<div class="imp-kpi"><span class="l">${sw ? `<span class="swatch sw-${sw}"></span>` : ''}${label}</span><strong>${k === 'escludi' ? tot[k][0] : eur(tot[k][1])}</strong><span class="n">${k === 'escludi' ? 'giroconti, storni, doppioni' : nMov(tot[k][0])}</span></div>`
+      : '');
+
+    const months = new Map();
+    for (const p of rows) {
+      if (p.dest === 'escludi') continue;
+      const key = p.y * 12 + p.m;
+      const g = months.get(key) || { y: p.y, m: p.m, usc: 0, uscTot: 0, ent: 0, entTot: 0 };
+      if (p.dest === 'entrata') { g.ent++; g.entTot = r2(g.entTot + p.importo); }
+      else { g.usc++; g.uscTot = r2(g.uscTot - p.importo); }
+      months.set(key, g);
+    }
+    const list = [...months.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => {
+      const mo = budget.getMonth(g.y, g.m);
+      return { ...g, gia: mo ? mo.entrate.length + mo.uscite.length : 0 };
+    });
+    const conVoci = list.filter(g => g.gia);
+
+    const n = rows.filter(daVerificare).length;
+    const info = [];
+    if (imp.giaImportati) info.push(imp.giaImportati === 1 ? '1 movimento era già stato importato: non lo ripropongo.' : `${imp.giaImportati} movimenti erano già stati importati: non li ripropongo.`);
+    if (imp.nonContabilizzati) info.push(imp.nonContabilizzati === 1 ? '1 movimento non è ancora contabilizzato: lo importerai con il prossimo elenco.' : `${imp.nonContabilizzati} movimenti non sono ancora contabilizzati: li importerai con il prossimo elenco.`);
+    const bloccati = imp.proposte.filter(p => p.bloccato).length;
+    if (bloccati) info.push(`${bloccati} ${bloccati === 1 ? 'movimento è' : 'movimenti sono'} di un anno il cui file non è leggibile: non ${bloccati === 1 ? 'verrà importato' : 'verranno importati'}.`);
+
+    return `<div class="imp-kpis">
+        ${kpi('nec', DIV.nec.nome, 'nec')}${kpi('des', DIV.des.nome, 'des')}${kpi('prelievo', 'Prelievi dai risparmi', 'ris')}${kpi('entrata', 'Entrate')}${kpi('escludi', 'Esclusi')}
+      </div>
+      ${info.map(t => `<p class="imp-info">${t}</p>`).join('')}
+      ${n
+        ? `<div class="imp-msg warn">${icon('warn')}<div><strong>${n === 1 ? '1 movimento da verificare' : `${n} movimenti da verificare`}.</strong> Non sono sicuro di dove metterli. Se importi così uso la proposta indicata (le uscite non riconosciute vanno in ${DIV[BankImport.DEFAULT.div].nome} › ${BankImport.DEFAULT.categoria}, le spese grandi diventano prelievi dai risparmi); altrimenti rivedili: sono in cima all'elenco.</div></div>`
+        : `<div class="imp-msg ok">${icon('check')}<div>Tutti i movimenti sono stati smistati.</div></div>`}
+      ${list.length ? `<h3>Mesi</h3>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Mese</th><th class="n">Uscite</th><th class="n">Entrate</th><th></th></tr></thead>
+        <tbody>${list.map(g => `<tr>
+          <td>${monthLabel(g.y, g.m)}</td>
+          <td class="n">${g.usc ? `${eur(g.uscTot)} <span class="muted">(${g.usc})</span>` : '—'}</td>
+          <td class="n">${g.ent ? `${eur(g.entTot)} <span class="muted">(${g.ent})</span>` : '—'}</td>
+          <td>${g.gia ? `<span class="tag t-warn">già ${g.gia} ${g.gia === 1 ? 'voce' : 'voci'}</span>` : ''}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : ''}
+      ${conVoci.length ? `<div class="imp-msg">${icon('alert')}<div>In ${conVoci.map(g => monthLabel(g.y, g.m).toLowerCase()).join(', ')} ci sono già delle voci. I movimenti uguali (stesso importo, data vicina) li ho esclusi; se però le avevi inserite come totali (es. «Spesa alimentare 250 €»), dopo l'import eliminale per non contarle due volte.</div></div>` : ''}`;
+  }
+
+  function impFilters(imp) {
+    const P = imp.proposte;
+    const b = (f, label) => `<button type="button" data-imp="filter" data-f="${f}" class="${imp.filtro === f ? 'on' : ''}">${label}</button>`;
+    return `<div class="seg imp-filters" data-imp-filters role="group" aria-label="Quali movimenti mostrare">
+      ${b('dubbi', `${icon('warn')} Da verificare (${P.filter(daVerificare).length})`)}${b('tutti', `Tutti (${P.length})`)}${b('esclusi', `Esclusi (${P.filter(p => p.dest === 'escludi').length})`)}</div>`;
+  }
+
+  function impRow(imp, i) {
+    const p = imp.proposte[i];
+    const isIn = p.importo > 0;
+    const dis = p.bloccato ? 'disabled' : '';
+    const warn = daVerificare(p);
+    const dests = isIn
+      ? [['entrata', 'Entrata'], ['nec', `Rimborso ${DIV.nec.nome}`], ['des', `Rimborso ${DIV.des.nome}`], ['escludi', 'Escludi']]
+      : [['nec', DIV.nec.nome], ['des', DIV.des.nome], ...(budget.settings.categorie.ris.length ? [['prelievo', 'Prelievo dai risparmi']] : []), ['escludi', 'Escludi']];
+    let cat = '';
+    if (p.dest === 'nec' || p.dest === 'des') {
+      const own = budget.settings.categorie[p.dest];
+      const list = own.includes(p.categoria) || !p.categoria ? own : [...own, p.categoria];
+      cat = `<select data-imp-cat aria-label="Categoria" ${dis}>${list.map(c => `<option value="${esc(c)}" ${c === p.categoria ? 'selected' : ''}>${esc(c)}${own.includes(c) ? '' : ' (nuova)'}</option>`).join('')}<option value="__new">+ Nuova categoria…</option></select>`;
+    } else if (p.dest === 'prelievo') {
+      cat = `<select data-imp-cat aria-label="Da quale fondo" ${dis}>${budget.settings.categorie.ris.map(c => `<option value="${esc(c)}" ${c === p.categoria ? 'selected' : ''}>${esc(c)} · ${eur(budget.fundBalance('ris', c))}</option>`).join('')}</select>`;
+    }
+    const why = p.bloccato || (p.toccato ? 'Scelto da te' : p.motivo);
+    const cls = ['imp-row', warn && 'dubbio', p.dubbio && p.toccato && 'risolto', p.dest === 'escludi' && 'escluso', p.bloccato && 'bloccato'].filter(Boolean).join(' ');
+    const open = imp.aperto === i;
+    return `<li class="${cls}" data-i="${i}">
+      <span class="imp-ic">${warn ? `<span title="Da verificare">${icon('warn')}</span>` : p.dubbio && p.toccato ? icon('check') : ''}</span>
+      <button type="button" class="imp-main" data-imp="open" aria-expanded="${open}" title="Dettagli del movimento">
+        <span class="d">${esc(p.descrizione)}</span>
+        <span class="s">${itDate(p.data)} · ${esc(p.banca)}${why ? ' · ' + esc(why) : ''}</span>
+      </button>
+      <span class="imp-amt ${isIn ? 'pos' : ''}">${isIn ? '+' : '−'}${eur(Math.abs(p.importo))}</span>
+      <div class="imp-ctrl"><select data-imp-dest aria-label="Dove va" ${dis}>${dests.map(([v, l]) => `<option value="${v}" ${v === p.dest ? 'selected' : ''}>${l}</option>`).join('')}</select>${cat}</div>
+      ${open ? impDetail(p) : ''}
+    </li>`;
+  }
+
+  function impDetail(p) {
+    const dis = p.bloccato ? 'disabled' : '';
+    return `<div class="imp-detail">
+      <label class="f"><span>Descrizione</span><input data-imp-desc maxlength="80" value="${esc(p.descrizione)}" ${dis}></label>
+      ${p.dest === 'entrata' ? `<label class="check"><input type="checkbox" data-imp-ricorrente ${p.ricorrente ? 'checked' : ''} ${dis}><span>Entrata ricorrente: proponi di copiarla nei mesi successivi</span></label>` : ''}
+      ${BankImport.learnable(p.chiave) ? `<label class="check"><input type="checkbox" data-imp-ricorda ${p.ricorda ? 'checked' : ''} ${dis}><span>Ricorda per i prossimi import: «${esc(p.chiave)}» → ${esc(destLabel(p.dest, p.categoria))}</span></label>` : ''}
+      ${p.toccato ? `<p class="small muted">Proposta di Hose: ${esc(destLabel(p.proposta.dest, p.proposta.categoria))}${p.motivo ? ' · ' + esc(p.motivo) : ''}</p>` : ''}
+      <p class="imp-raw"><span>Testo della banca · ${esc(p.banca)}, contabilizzato il ${itDate(p.dataContabile)}${p.causale ? ' · ' + esc(p.causale) : ''}</span>${esc(p.testo)}</p>
+    </div>`;
+  }
+
+  function impReview(imp) {
+    const P = imp.proposte;
+    const idx = P.map((_, i) => i);
+    const head = t => `<li class="imp-head">${t}</li>`;
+    let html = '';
+    if (imp.filtro === 'dubbi') {
+      html = idx.filter(i => P[i].dubbio).map(i => impRow(imp, i)).join('') || '<li class="imp-empty">Nessun movimento da verificare.</li>';
+    } else if (imp.filtro === 'esclusi') {
+      html = idx.filter(i => P[i].dest === 'escludi').map(i => impRow(imp, i)).join('') || '<li class="imp-empty">Nessun movimento escluso.</li>';
+    } else {
+      const dubbi = idx.filter(i => P[i].dubbio);
+      if (dubbi.length) html += head(`${icon('warn')} Da verificare`) + dubbi.map(i => impRow(imp, i)).join('');
+      let last = null;
+      for (const i of idx.filter(j => !P[j].dubbio)) {
+        const key = P[i].y * 12 + P[i].m;
+        if (key !== last) { html += head(monthLabel(P[i].y, P[i].m)); last = key; }
+        html += impRow(imp, i);
+      }
+    }
+    return `${impFilters(imp)}<ul class="imp-list">${html}</ul>`;
+  }
+
+  function impFooter(imp) {
+    if (imp.fase === 'riepilogo') {
+      return `<button type="button" class="btn ghost" data-close>Annulla</button><span class="grow"></span>
+        <button type="button" class="btn" data-imp="review">Rivedi i movimenti</button>
+        <button type="button" class="btn primary" data-imp="apply">${imp.rivisto ? 'Importa' : 'Importa così'}</button>`;
+    }
+    const n = imp.proposte.filter(daImportare).length;
+    return `<button type="button" class="btn ghost" data-imp="back">${icon('left')} Riepilogo</button><span class="grow"></span>
+      <button type="button" class="btn primary" data-imp="apply">${n ? `Importa ${n === 1 ? '1 movimento' : `${n} movimenti`}` : 'Conferma le esclusioni'}</button>`;
+  }
+
+  /** Dialogo dell'import: riepilogo («Importa così» / «Rivedi i movimenti») e revisione riga per riga. */
+  function bankDialog(imp) {
+    $dialog.classList.add('wide');
+    $dialog.dataset.sticky = '1';
+    $dialog.innerHTML = `<div class="dlg imp">
+      <header><h2>Importa movimenti</h2>
+        <div class="muted">${imp.files.map(f => `${esc(f.banca)} · ${f.movimenti.length === 1 ? '1 movimento' : `${f.movimenti.length} movimenti`}${f.dal ? ` dal ${itDate(f.dal)} al ${itDate(f.al)}` : ''}`).join('<br>')}</div></header>
+      <div class="imp-body" data-imp-body></div>
+      <footer data-imp-foot></footer>
+    </div>`;
+    const root = $dialog.firstElementChild;
+    const body = root.querySelector('[data-imp-body]');
+    const foot = root.querySelector('[data-imp-foot]');
+    const draw = () => {
+      body.innerHTML = imp.fase === 'riepilogo' ? impSummary(imp) : impReview(imp);
+      foot.innerHTML = impFooter(imp);
+      body.scrollTop = 0;
+    };
+    // ridisegna solo le righe toccate (e i contatori), così non si perde la posizione nell'elenco
+    const redraw = (idxs, focusSel) => {
+      for (const i of idxs) {
+        const li = body.querySelector(`[data-i="${i}"]`);
+        if (li) li.outerHTML = impRow(imp, i);
+      }
+      const f = body.querySelector('[data-imp-filters]');
+      if (f) f.outerHTML = impFilters(imp);
+      foot.innerHTML = impFooter(imp);
+      if (focusSel) { const el = body.querySelector(`[data-i="${idxs[0]}"] ${focusSel}`); if (el) el.focus(); }
+    };
+    const rowOf = el => { const li = el.closest('[data-i]'); return li ? Number(li.dataset.i) : -1; };
+
+    root.addEventListener('click', e => {
+      const b = e.target.closest('[data-imp]');
+      if (!b || b.disabled) return;
+      switch (b.dataset.imp) {
+        case 'review': imp.fase = 'revisione'; imp.rivisto = true; draw(); break;
+        case 'back': imp.fase = 'riepilogo'; draw(); break;
+        case 'filter': imp.filtro = b.dataset.f; imp.aperto = -1; draw(); break;
+        case 'open': {
+          const i = rowOf(b), prev = imp.aperto;
+          imp.aperto = prev === i ? -1 : i;
+          redraw(prev >= 0 && prev !== i ? [i, prev] : [i], '[data-imp="open"]');
+          break;
+        }
+        case 'apply': $dialog.close(); applyBankImport(imp); break;
+        default: break;
+      }
+    });
+    root.addEventListener('change', e => {
+      const el = e.target, i = rowOf(el);
+      if (i < 0) return;
+      const p = imp.proposte[i];
+      if (el.matches('[data-imp-dest]')) {
+        redraw(changeRow(imp, i, el.value, defaultCat(p, el.value)), '[data-imp-dest]');
+      } else if (el.matches('[data-imp-cat]')) {
+        let categoria = el.value;
+        if (categoria === '__new') {
+          categoria = (prompt(`Nome della nuova categoria in ${DIV[p.dest].nome}:`) || '').trim().slice(0, 40);
+          if (!categoria) { el.value = p.categoria; return; }
+        }
+        redraw(changeRow(imp, i, p.dest, categoria), '[data-imp-cat]');
+      } else if (el.matches('[data-imp-ricorda]')) p.ricorda = el.checked;
+      else if (el.matches('[data-imp-ricorrente]')) p.ricorrente = el.checked;
+    });
+    root.addEventListener('input', e => {
+      if (!e.target.matches('[data-imp-desc]')) return;
+      const p = imp.proposte[rowOf(e.target)];
+      p.descrizione = e.target.value;
+      const d = e.target.closest('[data-i]').querySelector('.imp-main .d');
+      if (d) d.textContent = p.descrizione;
+    });
+
+    draw();
+    if (!$dialog.open) $dialog.showModal();
+  }
+
+  /** Registra i movimenti scelti nei mesi, salva regole e movimenti visti. Si può annullare dal toast. */
+  function applyBankImport(imp) {
+    const s = budget.settings;
+    const rows = imp.proposte.filter(p => !p.bloccato);
+    const before = JSON.parse(JSON.stringify({ categorie: s.categorie, import: s.import }));
+    const added = [];
+    for (const p of rows) {
+      s.import.visti[p.rif] = p.dataContabile;
+      if (p.dest === 'escludi') continue;
+      const mo = budget.ensureMonth(p.y, p.m);
+      const item = { id: Model.newId(), data: p.data, descrizione: p.descrizione.trim() || p.descOrig, ricorrente: !!p.ricorrente };
+      if (p.dest === 'entrata') {
+        mo.entrate.push({ ...item, importo: Math.abs(p.importo) });
+      } else if (p.dest === 'prelievo') {
+        mo.uscite.push({ ...item, div: 'ris', tipo: 'prelievo', categoria: p.categoria || fondoPredefinito(), importo: Math.abs(p.importo) });
+      } else {
+        const categoria = p.categoria || BankImport.DEFAULT.categoria;
+        if (!s.categorie[p.dest].includes(categoria)) s.categorie[p.dest].push(categoria);
+        // importo negativo = rimborso: riduce lo speso della categoria
+        mo.uscite.push({ ...item, div: p.dest, tipo: 'spesa', categoria, importo: r2(-p.importo) });
+      }
+      added.push({ y: p.y, m: p.m, id: item.id });
+    }
+    for (const p of rows) {
+      if (!p.ricorda || !BankImport.learnable(p.chiave)) continue;
+      s.import.regole[p.chiave] = p.dest === 'entrata' || p.dest === 'escludi' ? { dest: p.dest } : { dest: p.dest, categoria: p.categoria };
+    }
+    s.import.conti.intestatari = [...new Set([...s.import.conti.intestatari, ...imp.intestatari])];
+    s.import.conti.iban = [...new Set([...s.import.conti.iban, ...imp.iban])];
+    // i riferimenti vecchi non servono più: le banche esportano al massimo qualche mese indietro
+    const limit = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10);
+    for (const [k, d] of Object.entries(s.import.visti)) if (d < limit) delete s.import.visti[k];
+    markSettings();
+
+    if (!added.length) { render(); toast('Nessun movimento importato: le esclusioni sono state salvate.'); return; }
+    const firstY = Math.min(...added.map(a => a.y));
+    markDirty(firstY);
+    const months = [...new Set(added.map(a => a.y * 12 + a.m))].sort((a, b) => a - b);
+    const last = months[months.length - 1];
+    const href = monthHref(Math.floor(last / 12), last % 12);
+    if (location.hash === href) render(); else location.hash = href;
+    toast(`Importati ${added.length === 1 ? '1 movimento' : `${added.length} movimenti`} in ${months.length === 1 ? '1 mese' : `${months.length} mesi`}.`, {
+      ms: 12000,
+      action: {
+        label: 'Annulla',
+        fn: () => {
+          const ids = new Set(added.map(a => a.id));
+          for (const key of months) {
+            const mo = budget.getMonth(Math.floor(key / 12), key % 12);
+            if (!mo) continue;
+            mo.entrate = mo.entrate.filter(x => !ids.has(x.id));
+            mo.uscite = mo.uscite.filter(x => !ids.has(x.id));
+          }
+          budget.settings.categorie = before.categorie;
+          budget.settings.import = before.import;
+          markDirty(firstY);
+          markSettings();
+          render();
+          toast('Import annullato.');
+        },
+      },
+    });
   }
 
   const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -1773,6 +2159,21 @@
         toast('Ora i dati vengono salvati nel browser.');
         break;
       case 'import': $import.value = ''; $import.click(); break;
+      case 'import-bank': $bankInput.value = ''; $bankInput.click(); break;
+      case 'del-rule':
+        delete budget.settings.import.regole[el.dataset.key];
+        markSettings();
+        render();
+        toast(`Regola per «${el.dataset.key}» eliminata.`);
+        break;
+      case 'reset-visti': {
+        const n = Object.keys(budget.settings.import.visti).length;
+        if (!confirm(`Dimenticare i ${n} movimenti già importati o scartati?\n\nSe reimporti un elenco che li contiene, verranno proposti di nuovo: attenzione ai doppioni.`)) break;
+        budget.settings.import.visti = {};
+        markSettings();
+        render();
+        break;
+      }
       case 'export-xlsx': exportYear(Number(document.querySelector('[data-export-year]').value)); break;
       case 'export-csv': {
         const y = Number(document.querySelector('[data-export-year]').value);
@@ -1798,6 +2199,7 @@
   });
 
   $import.addEventListener('change', () => { if ($import.files.length) importFiles([...$import.files]); });
+  $bankInput.addEventListener('change', () => { if ($bankInput.files.length) importBankFiles([...$bankInput.files]); });
 
   document.addEventListener('submit', e => {
     const form = e.target.closest('form[data-form]');
@@ -1901,7 +2303,7 @@
   }
 
   // Per i test dalla console del browser.
-  window.Hose = { budget, state, flush, render, importFiles };
+  window.Hose = { budget, state, flush, render, importFiles, importBankFiles };
 
   start();
 })();

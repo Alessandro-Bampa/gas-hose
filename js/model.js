@@ -86,13 +86,41 @@
   };
 
   function defaultSettings() {
-    return { versione: 3, percentuali: { nec: 50, des: 30, ris: 20 }, categorie: defaultCategories(), obiettivi: [] };
+    return { versione: 3, percentuali: { nec: 50, des: 30, ris: 20 }, categorie: defaultCategories(), obiettivi: [], import: normalizeImport(null) };
+  }
+
+  const IMPORT_DESTS = ['nec', 'des', 'entrata', 'prelievo', 'escludi'];
+
+  /**
+   * Impostazioni dell'import dalla banca:
+   *   regole: { CHIAVE ESERCENTE: { dest, categoria } } — imparate dalle correzioni
+   *   visti:  { rif: 'AAAA-MM-GG' } — movimenti già importati o scartati, da non riproporre
+   *   conti:  { intestatari, iban } — del titolare, per riconoscere i giroconti
+   */
+  function normalizeImport(s) {
+    const out = { regole: {}, visti: {}, conti: { intestatari: [], iban: [] } };
+    if (!s || typeof s !== 'object') return out;
+    if (s.regole && typeof s.regole === 'object') {
+      for (const [k, r] of Object.entries(s.regole)) {
+        if (!k || !r || !IMPORT_DESTS.includes(r.dest)) continue;
+        out.regole[k] = r.categoria ? { dest: r.dest, categoria: String(r.categoria) } : { dest: r.dest };
+      }
+    }
+    if (s.visti && typeof s.visti === 'object') {
+      for (const [k, d] of Object.entries(s.visti)) if (/^\d{4}-\d{2}-\d{2}$/.test(d)) out.visti[k] = d;
+    }
+    const strings = a => (Array.isArray(a) ? uniq(a.map(x => String(x).trim()).filter(Boolean)) : []);
+    if (s.conti) {
+      out.conti.intestatari = strings(s.conti.intestatari);
+      out.conti.iban = strings(s.conti.iban).map(x => x.toUpperCase());
+    }
+    return out;
   }
 
   function normalizeSettings(s) {
     const d = defaultSettings();
     if (!s || typeof s !== 'object') return d;
-    const out = { versione: 3, percentuali: { ...d.percentuali }, categorie: {}, obiettivi: [] };
+    const out = { versione: 3, percentuali: { ...d.percentuali }, categorie: {}, obiettivi: [], import: normalizeImport(s.import) };
     if (s.percentuali) {
       const p = KEYS.map(k => Number(s.percentuali[k]));
       if (p.every(isFinite) && Math.abs(p[0] + p[1] + p[2] - 100) < 0.01) KEYS.forEach((k, i) => { out.percentuali[k] = p[i]; });
@@ -678,7 +706,7 @@
   global.Model = {
     MESI, DIVISIONI, KEYS, DIV, GOAL_DIVS, TIPI, FILE_RE,
     Budget, defaultSettings, normalizeSettings, normalizeYear, tipoOf,
-    emptyMonth, emptyYear, hasData, newId, parseAmount, r2, add, total, zero, byDate,
+    emptyMonth, emptyYear, hasData, newId, parseAmount, norm, r2, add, total, zero, byDate,
     fileName, yearToXlsx, readWorkbook, detectYear, yearFromWorkbook, yearToCsv,
   };
 })(window);
